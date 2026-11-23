@@ -38,7 +38,7 @@ func printJSON(cmd *cli.Command, v any) error {
 	return enc.Encode(v)
 }
 func newCommand(out, errOut io.Writer) *cli.Command {
-	return &cli.Command{Name: "invisi-explorer", Version: "1.3.0", Usage: "Run and configure an explorer for explicit public Invisi scopes", Writer: out, ErrWriter: errOut,
+	return &cli.Command{Name: "invisi-explorer", Version: "1.3.1", Usage: "Run and configure an explorer for explicit public Invisi scopes", Writer: out, ErrWriter: errOut,
 		Flags: []cli.Flag{&cli.StringFlag{Name: "dir", Usage: "Configuration and database directory", Value: "./invisi-explorer", Sources: cli.EnvVars("INVISI_EXPLORER_DATA_DIR")}},
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			if cmd.Args().Present() {
