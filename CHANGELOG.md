@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Prefetch up to four complete finalized history windows concurrently, then validate fresh boundaries and publish in order through one atomic SQLite transaction per window. Retain sequential near-head scanning, durable dense-page cursors and reorg recovery.
+- Fall back to durable scanning when bounded prefetch times out; discard interrupted terminal staging before refetching and retain accurate failure/last-success diagnostics. Public APIs and database ownership remain unchanged.
+
 ## 1.3.0
 
 - Release Explorer as an independent service with its own browser API, public query index and React frontend. Protocol RPC supplies chain facts, Provenance supplies recognition evidence and Broadcaster supplies optional public service information.

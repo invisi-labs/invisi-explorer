@@ -60,3 +60,11 @@ internal packages. Add provenance and broadcaster URLs only when those public
 services should be queried. An optional issuer ID is operator-provided metadata.
 
 All configuration updates apply after restarting the process. Scope identities and deployment/issuer pins are not changed by `chain set`; changing deployments requires an explicitly configured scope and a suitable independent query index.
+
+## Historical catch-up
+
+The worker prefetches up to four complete 128-block windows below the selected RPC's native finalized/indexed head. Each window is bounded to eight pages and 8 MiB of serialized data. Fetch workers never publish: fresh saved/terminal boundaries are checked, then complete windows commit in order through an atomic SQLite projection and checkpoint transaction. A failure cannot expose a later window across a gap.
+
+Bootstrap, near-head scans and persisted dense-page continuations retain the sequential path. Prefetch has a 30-second budget; exceeding it falls back to durable sequential scanning while parent cancellation still stops the worker. Unsupported native finalized status also uses the existing sequential path. The configured poll interval applies after catch-up or errors; active historical work continues without the normal poll delay.
+
+RPC settlement batching is a separate upstream optimization. Both service versions should be upgraded to obtain the combined improvement; Explorer remains compatible with the original JSON-RPC method and opaque cursor contract.
