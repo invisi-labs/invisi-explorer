@@ -1,0 +1,16 @@
+.git
+.local
+bin
+web/node_modules
+web/dist
+web/*.tsbuildinfo
+*.sqlite*
+*.key
+config.json
+.env*
+go.work
+go.work.sum
+.worktree
+
+invisi-explorer
+*.cursor-key
