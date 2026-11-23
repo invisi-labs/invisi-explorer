@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 var ErrCaughtUp = errors.New("caught up")
@@ -89,22 +88,7 @@ func (s *Syncer) Tick(ctx context.Context, c config.Chain) (tickErr error) {
 	if s.Store.DB.QueryRowContext(ctx, "SELECT payload FROM source_status WHERE scope=? AND source='protocol'", scope.Key()).Scan(&previous) == nil {
 		_ = json.Unmarshal([]byte(previous), &observation)
 	}
-	defer func() {
-		now := strconv.FormatInt(time.Now().Unix(), 10)
-		state := "ready"
-		if tickErr != nil && !errors.Is(tickErr, ErrCaughtUp) {
-			state = "unavailable"
-		} else {
-			observation["lastSuccessfulAt"] = now
-		}
-		observation["updatedAt"] = now
-		var number, hash string
-		if s.Store.DB.QueryRowContext(context.WithoutCancel(ctx), "SELECT block_number,block_hash FROM chain_checkpoints WHERE id=?", scope.Key()).Scan(&number, &hash) == nil {
-			n, _ := strconv.ParseUint(number, 10, 64)
-			observation["indexedHead"] = map[string]any{"blockNumber": strconv.FormatUint(n, 10), "blockHash": hash}
-		}
-		_ = s.Store.SourceStatus(context.WithoutCancel(ctx), scope, "protocol", state, observation)
-	}()
+	defer func() { s.recordSyncResult(ctx, scope, observation, tickErr) }()
 
 	d, e := s.Deployment(ctx, c)
 	if e != nil {
@@ -151,6 +135,14 @@ func (s *Syncer) Tick(ctx context.Context, c config.Chain) (tickErr error) {
 	e = s.Store.DB.QueryRowContext(ctx, "SELECT cursor,target FROM sync_windows WHERE scope=?", scope.Key()).Scan(&cursor, &target)
 	if e == nil {
 		end, _ = strconv.ParseUint(target, 10, 64)
+		// Empty cursor denotes a completed-but-unpublished stage. After a
+		// restart refetch the range from a clean stage, never upsert a new
+		// fork into terminal rows left by the previous attempt.
+		if cursor == "" {
+			if e = s.Store.ResetStage(ctx, scope); e != nil {
+				return e
+			}
+		}
 	} else if !errors.Is(e, sql.ErrNoRows) {
 		return e
 	}

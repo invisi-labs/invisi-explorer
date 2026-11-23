@@ -72,3 +72,34 @@ func TestRefusesForeignDatabaseAndKeepsOwnershipOnReopen(t *testing.T) {
 	}
 	defer s.Close()
 }
+
+func TestCompleteWindowRejectsForeignScopeAtomically(t *testing.T) {
+	ctx := context.Background()
+	s, e := Open(filepath.Join(t.TempDir(), "window.sqlite"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	scope := wire.Scope{ChainID: "97", ProtocolAddress: "0x0000000000000000000000000000000000000001"}
+	before := model.Anchor{BlockNumber: "1", BlockHash: wire.ZeroHash}
+	if e = s.Stage(ctx, scope, nil, "", "1"); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Publish(ctx, scope, before); e != nil {
+		t.Fatal(e)
+	}
+	op := model.Operation{ChainID: "1", ProtocolAddress: scope.ProtocolAddress, BlockNumber: "2", BlockHash: wire.ZeroHash, TxHash: wire.ZeroHash, OperationIndex: "0"}
+	if e = s.PublishWindow(ctx, scope, before, model.Anchor{BlockNumber: "2", BlockHash: wire.ZeroHash}, []model.Operation{op}); e == nil {
+		t.Fatal("foreign scope was published")
+	}
+	var count int
+	s.DB.QueryRow("SELECT COUNT(*) FROM operations").Scan(&count)
+	if count != 0 {
+		t.Fatal("partial projection survived rejection")
+	}
+	var height string
+	s.DB.QueryRow("SELECT block_number FROM chain_checkpoints WHERE id=?", scope.Key()).Scan(&height)
+	if height != pad("1") {
+		t.Fatal("rejected window advanced checkpoint")
+	}
+}

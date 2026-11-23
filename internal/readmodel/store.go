@@ -168,27 +168,66 @@ func (s *Store) Publish(ctx context.Context, scope wire.Scope, a model.Anchor) e
 	if e != nil {
 		return e
 	}
-	for _, op := range ops {
-		if e = project(ctx, tx, op); e != nil {
-			return e
-		}
-	}
-	for _, id := range []string{scope.Key(), scope.Key() + "/block/" + pad(a.BlockNumber)} {
-		if _, e = tx.ExecContext(ctx, "INSERT INTO chain_checkpoints VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET block_number=excluded.block_number,block_hash=excluded.block_hash", id, pad(a.BlockNumber), strings.ToLower(a.BlockHash)); e != nil {
-			return e
-		}
-	}
-	if _, e = tx.ExecContext(ctx, "INSERT INTO chain_generations VALUES(?,?) ON CONFLICT(id) DO NOTHING", scope.Key(), pad("1")); e != nil {
-		return e
-	}
-	if _, e = tx.ExecContext(ctx, "DELETE FROM staged_operations WHERE scope=?", scope.Key()); e != nil {
-		return e
-	}
-	if _, e = tx.ExecContext(ctx, "DELETE FROM sync_windows WHERE scope=?", scope.Key()); e != nil {
+	if e = publishWindow(ctx, tx, scope, a, ops); e != nil {
 		return e
 	}
 	return tx.Commit()
 }
+
+// PublishWindow atomically projects an already verified complete window. It
+// checks the saved boundary inside the writer transaction; no restart can leave
+// a terminal staging record whose operations could mix with a later fork.
+func (s *Store) PublishWindow(ctx context.Context, scope wire.Scope, expected, a model.Anchor, ops []model.Operation) error {
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	var number, hash string
+	if e = tx.QueryRowContext(ctx, "SELECT block_number,block_hash FROM chain_checkpoints WHERE id=?", scope.Key()).Scan(&number, &hash); e != nil {
+		return e
+	}
+	if number != pad(expected.BlockNumber) || !strings.EqualFold(hash, expected.BlockHash) {
+		return fmt.Errorf("checkpoint changed during window publication")
+	}
+	var pending int
+	if e = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM sync_windows WHERE scope=?", scope.Key()).Scan(&pending); e != nil {
+		return e
+	}
+	if pending != 0 {
+		return fmt.Errorf("cannot replace a staged sync window")
+	}
+	if e = publishWindow(ctx, tx, scope, a, ops); e != nil {
+		return e
+	}
+	return tx.Commit()
+}
+func publishWindow(ctx context.Context, tx *sql.Tx, scope wire.Scope, a model.Anchor, ops []model.Operation) error {
+	for _, op := range ops {
+		if op.ChainID != scope.ChainID || !strings.EqualFold(op.ProtocolAddress, scope.ProtocolAddress) {
+			return fmt.Errorf("operation scope mismatch")
+		}
+		if e := project(ctx, tx, op); e != nil {
+			return e
+		}
+	}
+	for _, id := range []string{scope.Key(), scope.Key() + "/block/" + pad(a.BlockNumber)} {
+		if _, e := tx.ExecContext(ctx, "INSERT INTO chain_checkpoints VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET block_number=excluded.block_number,block_hash=excluded.block_hash", id, pad(a.BlockNumber), strings.ToLower(a.BlockHash)); e != nil {
+			return e
+		}
+	}
+	if _, e := tx.ExecContext(ctx, "INSERT INTO chain_generations VALUES(?,?) ON CONFLICT(id) DO NOTHING", scope.Key(), pad("1")); e != nil {
+		return e
+	}
+	if _, e := tx.ExecContext(ctx, "DELETE FROM staged_operations WHERE scope=?", scope.Key()); e != nil {
+		return e
+	}
+	if _, e := tx.ExecContext(ctx, "DELETE FROM sync_windows WHERE scope=?", scope.Key()); e != nil {
+		return e
+	}
+	return nil
+}
+
 func (s *Store) Rollback(ctx context.Context, scope wire.Scope, height uint64) error {
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {

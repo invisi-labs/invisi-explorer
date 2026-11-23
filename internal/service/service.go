@@ -103,7 +103,7 @@ func Run(ctx context.Context, c config.Config) error {
 					return
 				case <-timer.C:
 					state := "ready"
-					syncErr := syncer.Tick(workerCtx, chain)
+					syncErr := syncer.CatchUp(workerCtx, chain)
 					caughtUp := errors.Is(syncErr, upstream.ErrCaughtUp)
 					if syncErr != nil && !caughtUp {
 						state = "unavailable"
