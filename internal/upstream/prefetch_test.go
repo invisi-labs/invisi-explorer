@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,8 +35,8 @@ func prefetchFixture(t *testing.T, mode string) (*Syncer, config.Chain, *atomic.
 		t.Fatal(e)
 	}
 	active, maxActive := new(atomic.Int64), new(atomic.Int64)
-	startedSecond := make(chan struct{})
-	var once sync.Once
+	allStarted := make(chan struct{})
+	var arrivals atomic.Int64
 	var fetching atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var q struct {
@@ -71,12 +70,15 @@ func prefetchFixture(t *testing.T, mode string) (*Syncer, config.Chain, *atomic.
 			json.Unmarshal(q.Params[0]["toBlock"], &to)
 			var cursor string
 			json.Unmarshal(q.Params[0]["cursor"], &cursor)
-			if from > 129 {
-				once.Do(func() { close(startedSecond) })
-			}
-			if mode == "ordered" && from == 129 {
+			if mode == "ordered" {
+				// Hold every worker until all four arrive. Otherwise a later
+				// window can finish before the first request starts, making a
+				// genuinely concurrent implementation appear serialized.
+				if arrivals.Add(1) == 4 {
+					close(allStarted)
+				}
 				select {
-				case <-startedSecond:
+				case <-allStarted:
 				case <-r.Context().Done():
 					return
 				}
