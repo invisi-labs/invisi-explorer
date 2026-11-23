@@ -34,16 +34,48 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
-  container:
+  release-archives:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+      - name: Export clean source
+        run: mkdir source && git archive HEAD | tar -x -C source
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: source/go.mod
+          cache-dependency-path: source/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: source/web/package-lock.json
+      - name: Build and test four platform archives from clean source
+        working-directory: source
+        run: |
+          tag="v$(node -p "require('./web/package.json').version")"
+          ./scripts/build-release.sh "$tag" ../release-assets
+          python3 scripts/smoke-archives.py "$tag" ../release-assets
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Export clean source
+        run: mkdir source && git archive HEAD | tar -x -C source
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: source
+          file: source/Dockerfile
+          platforms: linux/${{ matrix.arch }}
           push: false
           load: true
           tags: invisi-explorer:ci
-      - run: docker run --rm invisi-explorer:ci --help
+      - name: Smoke test image HTTP assets and license
+        working-directory: source
+        run: ./scripts/smoke-image.sh invisi-explorer:ci

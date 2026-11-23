@@ -14,3 +14,5 @@ go.work.sum
 
 invisi-explorer
 *.cursor-key
+
+dist

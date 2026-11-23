@@ -61,3 +61,24 @@ docker run --rm -v invisi-explorer-data:/var/lib/invisi-explorer invisi-explorer
 # Add explicit chain/token configuration with the CLI before running.
 docker run --rm -p 18670:18670 -v invisi-explorer-data:/var/lib/invisi-explorer invisi-explorer:local
 ```
+
+## Releases
+
+The [v1.3.0 GitHub Release](https://github.com/invisi-labs/invisi-explorer/releases/tag/v1.3.0) contains `invisi-explorer_v1.3.0_{linux,darwin}_{amd64,arm64}.tar.gz` and `SHA256SUMS-v1.3.0.txt`. Each archive includes the executable, built frontend under `web/dist`, license and documentation. Verify the downloaded archives with `sha256sum -c SHA256SUMS-v1.3.0.txt` (macOS: `shasum -a 256 -c SHA256SUMS-v1.3.0.txt`).
+
+Run from the extracted archive directory so the default `web/dist` resolves correctly:
+
+```sh
+tar -xzf invisi-explorer_v1.3.0_linux_amd64.tar.gz
+cd invisi-explorer_v1.3.0_linux_amd64
+./invisi-explorer --version
+./invisi-explorer --dir ./data init
+# Configure explicit chain/token scopes as described in cammand.md.
+./invisi-explorer --dir ./data run
+```
+
+When running from another directory, persist an absolute frontend path with `./invisi-explorer --dir /path/to/data settings set --web-dir /path/to/extracted/web/dist`.
+
+The release image is `ghcr.io/invisi-labs/invisi-explorer:1.3.0` for Linux amd64 and arm64. Use it in the container examples above in place of `invisi-explorer:local`; keep the explicit static directory setting `/opt/invisi/explorer`. Image digests and source revisions are recorded in the release notes.
+
+Maintainers can reproduce the four archives with `./scripts/build-release.sh v1.3.0 dist` (Go, Node 24 and Python 3.12+), then run `python3 scripts/smoke-archives.py v1.3.0 dist`. The build installs frontend dependencies and rebuilds assets rather than consuming existing `web/dist`. Stable `vX.Y.Z` tags trigger the publish workflow: test the tagged Go/frontend source, build and smoke-test archives, publish the multiarchitecture GHCR image, smoke-test its HTTP assets and license, and attach archives/checksums plus the exact changelog section to GitHub Releases. Manual dispatch accepts an existing stable tag; an optional full revision publishes only a separately named deployment image. Clean-source CI builds both image architectures and archives without sibling checkouts or ignored host assets.

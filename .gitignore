@@ -47,3 +47,6 @@ web/*.tsbuildinfo
 cursor.key
 /invisi-explorer
 *.cursor-key
+
+# Release assets
+/dist/
