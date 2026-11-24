@@ -3,9 +3,13 @@ package explorer
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/invisi-labs/invisi-explorer/internal/api"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/invisi-labs/invisi-explorer/internal/model"
 	p "github.com/invisi-labs/invisi-explorer/internal/wire"
@@ -36,6 +40,9 @@ func (e *Explorer) source(route string) (from, index, extra string) {
 	}
 }
 func (e *Explorer) list(ctx context.Context, route string, q query) (Page, error) {
+	if route == "transactions" {
+		return e.transactionList(ctx, q)
+	}
 	snapshot, after, err := e.pageContext(ctx, route, q)
 	if err != nil {
 		return Page{}, err
@@ -99,11 +106,25 @@ func (e *Explorer) list(ctx context.Context, route string, q query) (Page, error
 		where += " AND n.public_type=?"
 		args = append(args, kind)
 	}
+	if route == "grants" && q.hash == "" {
+		latest, latestArgs := e.latestGrantCondition(snapshot)
+		where += " AND " + latest
+		args = append(args, latestArgs...)
+	}
 	var count int64
 	if err = e.db.QueryRowContext(ctx, e.sql("SELECT COUNT(*) FROM "+from+" WHERE "+where), args...).Scan(&count); err != nil {
 		return Page{}, publicError("UNAVAILABLE")
 	}
 	timeSQL := e.timeSQL()
+	if route == "grants" {
+		log := e.extract("o.payload", "logIndex")
+		operation := e.extract("o.payload", "operationIndex")
+		if e.options.Dialect == "postgres" {
+			timeSQL = "o.block_number||lpad(" + log + ",20,'0')||lpad(" + operation + ",20,'0')"
+		} else {
+			timeSQL = "o.block_number||substr('00000000000000000000'||" + log + ",-20)||substr('00000000000000000000'||" + operation + ",-20)"
+		}
+	}
 	paged := where
 	pageArgs := append([]any(nil), args...)
 	if after != nil {
@@ -262,6 +283,9 @@ func drawRecord(op model.Operation) map[string]any {
 }
 func (e *Explorer) operation(ctx context.Context, op model.Operation) (map[string]any, error) {
 	out := copyMap(op)
+	if recipient := withdrawalAddress(op); recipient != "" {
+		out["withdrawalAddress"] = recipient
+	}
 	notes := []map[string]any{}
 	for i, n := range op.NoteOutputs {
 		v := map[string]any{"noteCommitment": n.NoteCommitment, "treeId": n.TreeID, "leafIndex": n.LeafIndex}
@@ -403,6 +427,10 @@ func (e *Explorer) project(ctx context.Context, route string, r publicRow) (map[
 		}
 		base["nullifier"] = list[r.index]
 	case "grants":
+		base["authorizationStatus"] = grantAuthorizationStatus(op.Kind)
+		for k, v := range creditActivity(op, stringValue(payload["payer"])) {
+			base[k] = v
+		}
 		for k, v := range onlyPublic(payload, "payer", "owner", "payerIndex", "grantId", "tokenAddress", "revoked") {
 			base[k] = v
 		}
@@ -416,6 +444,9 @@ func (e *Explorer) project(ctx context.Context, route string, r publicRow) (map[
 	return base, nil
 }
 func (e *Explorer) transaction(ctx context.Context, q query, hash string) (any, error) {
+	// Kind/token/address are list selectors. A transaction detail always returns
+	// all its members within the requested chain/Core deployment.
+	q.kind, q.token, q.address = "", "", ""
 	if !hashHex(hash, 32) {
 		return nil, publicError("INVALID_PARAMS")
 	}
@@ -471,12 +502,42 @@ func (e *Explorer) transaction(ctx context.Context, q query, hash string) (any, 
 	if len(raw) > 200 {
 		return nil, publicError("UNSUPPORTED")
 	}
+	sort.SliceStable(raw, func(i, j int) bool {
+		a, _ := strconv.ParseUint(raw[i].OperationIndex, 10, 64)
+		b, _ := strconv.ParseUint(raw[j].OperationIndex, 10, 64)
+		return a < b
+	})
 	ops := []any{}
 	recognition := []any{}
+	type observedTransaction struct {
+		value *model.TransactionObservation
+		err   error
+	}
+	observations := map[string]observedTransaction{}
+	observationCtx, stopObservation := context.WithTimeout(ctx, 5*time.Second)
+	defer stopObservation()
 	for _, op := range raw {
 		projected, err := e.operation(ctx, op)
 		if err != nil {
 			return nil, err
+		}
+		if op.Canonical && e.options.TransactionObservation != nil {
+			observationKey := op.ChainID + "/" + strings.ToLower(op.ProtocolAddress) + "/" + strings.ToLower(op.TxHash) + "/" + strings.ToLower(op.BlockHash)
+			cached, found := observations[observationKey]
+			if !found {
+				cached.value, cached.err = e.options.TransactionObservation(observationCtx, op)
+				observations[observationKey] = cached
+			}
+			observation, observationErr := cached.value, cached.err
+			if observationErr == nil && observation != nil {
+				projected["transactionObservation"] = observation
+			}
+			if observationErr != nil {
+				var public *api.Error
+				if errors.As(observationErr, &public) && public.Code == "CHAIN_REORGED" {
+					return nil, public
+				}
+			}
 		}
 		ops = append(ops, projected)
 		if r, ok := projected["recognition"]; ok {
@@ -490,7 +551,7 @@ func (e *Explorer) transaction(ctx context.Context, q query, hash string) (any, 
 	if err = e.validateSnapshot(ctx, snapshot); err != nil {
 		return nil, err
 	}
-	return map[string]any{"transactionHash": strings.ToLower(hash), "operations": ops, "recognition": recognition, "snapshot": snapshot, "orphaned": orphaned}, nil
+	return map[string]any{"transactionHash": strings.ToLower(hash), "operations": ops, "operationCount": strconv.Itoa(len(ops)), "recognition": recognition, "snapshot": snapshot, "orphaned": orphaned}, nil
 }
 func (e *Explorer) object(ctx context.Context, route string, q query, hash string, occurrences bool) (any, error) {
 	f, err := p.ParseField(hash)

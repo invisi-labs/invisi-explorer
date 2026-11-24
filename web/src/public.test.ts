@@ -6,6 +6,7 @@ import {
   request,
   objectIdentity,
   statusKey,
+  showsSourceRecognition,
   collectionFor,
   finalityKey,
 } from "./public";
@@ -113,4 +114,14 @@ it("keeps finality availability separate from execution and recognition", () => 
   expect(finalityKey("unavailable")).toBe("finalityUnavailable");
   expect(finalityKey("inconsistent")).toBe("finalityConflict");
   expect(finalityKey(undefined)).toBe("unknown");
+});
+
+it("hides inapplicable source recognition without hiding pending or mixed transactions", () => {
+  expect(showsSourceRecognition("credit-states", {})).toBe(false);
+  expect(showsSourceRecognition("transactions", {recognition: [{status: "not_applicable"}]})).toBe(false);
+  expect(showsSourceRecognition("transactions", {recognition: {recognitionState: "not_applicable"}})).toBe(false);
+  expect(showsSourceRecognition("transactions", {recognitionStatus: "not_applicable"})).toBe(false);
+  expect(showsSourceRecognition("transactions", {recognition: [{status: "not_applicable"}, {status: "pending_source"}]})).toBe(true);
+  expect(showsSourceRecognition("transactions", {})).toBe(true);
+  expect(showsSourceRecognition("notes", {recognition: [{status: "recognized"}]})).toBe(true);
 });

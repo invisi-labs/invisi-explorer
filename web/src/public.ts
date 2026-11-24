@@ -126,6 +126,7 @@ export function statusKey(value: unknown): import("./i18n").Key {
     unsupported: "unsupported",
     true: "success",
     false: "failed",
+    partial_success: "partialSuccess",
   };
   return labels[String(value)] ?? "unknown";
 }
@@ -157,4 +158,15 @@ export function finalityKey(value: unknown): import("./i18n").Key {
     inconsistent: "finalityConflict",
   };
   return labels[String(value)] ?? "unknown";
+}
+
+// Unknown or missing evidence remains visible; only explicitly inapplicable records are hidden.
+export function showsSourceRecognition(type: string, data: Record<string, unknown> | undefined): boolean {
+  if (type === "credit-states") return false;
+  const rows = Array.isArray(data?.recognition)
+    ? data.recognition
+    : data?.recognition && typeof data.recognition === "object" ? [data.recognition] : [];
+  if (rows.length) return rows.some((row) =>
+    !row || (row.status ?? row.recognitionState) !== "not_applicable");
+  return (data?.recognitionStatus ?? data?.status) !== "not_applicable";
 }

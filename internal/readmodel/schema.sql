@@ -26,3 +26,7 @@ CREATE INDEX IF NOT EXISTS operations_public_time ON operations(substr('00000000
 CREATE TABLE IF NOT EXISTS root_backfill(scope TEXT PRIMARY KEY,epoch TEXT NOT NULL,next_generation TEXT NOT NULL,after_sequence TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS token_metadata(chain_id TEXT NOT NULL,address TEXT NOT NULL,symbol TEXT NOT NULL DEFAULT '',decimals INTEGER CHECK(decimals BETWEEN 0 AND 255),retry_at INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(chain_id,address));
 CREATE INDEX IF NOT EXISTS token_metadata_retry ON token_metadata(chain_id,retry_at,address);
+
+CREATE TABLE IF NOT EXISTS credit_history_retry(operation_id TEXT PRIMARY KEY,retry_at INTEGER NOT NULL);
+
+CREATE INDEX IF NOT EXISTS public_grant_history_identity ON public_grant_ids(chain_id,protocol_address,LOWER(token_address),LOWER(payer),grant_id,block_number,operation_id);

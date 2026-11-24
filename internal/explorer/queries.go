@@ -24,6 +24,7 @@ func (e *Explorer) overview(ctx context.Context, q query) (any, error) {
 	args = append(args, params...)
 	counts := map[string]string{}
 	queries := map[string]string{"transactions": "SELECT COUNT(*) FROM (SELECT o.chain_id,o.protocol_address,o.tx_hash FROM operations o WHERE " + where + " GROUP BY o.chain_id,o.protocol_address,o.tx_hash) public_transactions", "operations": "SELECT COUNT(*) FROM operations o WHERE " + where, "notes": "SELECT COUNT(DISTINCT n.commitment) FROM public_notes n JOIN operations o ON o.id=n.operation_id WHERE " + where + " AND " + e.successSQL(), "creditStates": "SELECT COUNT(DISTINCT n.commitment) FROM public_credit_states n JOIN operations o ON o.id=n.operation_id WHERE " + where + " AND " + e.successSQL()}
+	queries["grants"] = "SELECT COUNT(*) FROM (SELECT n.chain_id,n.protocol_address,n.token_address,n.payer,n.grant_id FROM public_grant_ids n JOIN operations o ON o.id=n.operation_id WHERE " + where + " AND " + e.successSQL() + " AND n.payer<>'' AND n.grant_id<>'0' GROUP BY n.chain_id,n.protocol_address,LOWER(n.token_address),LOWER(n.payer),n.grant_id) grant_slots"
 	for key, sql := range queries {
 		var n int64
 		if err = e.db.QueryRowContext(ctx, e.sql(sql), args...).Scan(&n); err != nil {
@@ -31,7 +32,7 @@ func (e *Explorer) overview(ctx context.Context, q query) (any, error) {
 		}
 		counts[key] = strconv.FormatInt(n, 10)
 	}
-	out := map[string]any{"transactions": counts["transactions"], "operations": counts["operations"], "notes": counts["notes"], "creditStates": counts["creditStates"], "recognizedNotes": nil, "recognizedNotesBasis": "unavailable_remote_recognition", "updatedAt": s.AcquiredAt, "snapshot": s}
+	out := map[string]any{"transactions": counts["transactions"], "operations": counts["operations"], "notes": counts["notes"], "creditStates": counts["creditStates"], "grants": counts["grants"], "recognizedNotes": nil, "recognizedNotesBasis": "unavailable_remote_recognition", "updatedAt": s.AcquiredAt, "snapshot": s}
 	var recognized, known int64
 	var recognitionArgs []any
 	countSQL := "SELECT COUNT(DISTINCT CASE WHEN json_extract(r.payload,'$[0].status')='recognized' THEN n.commitment END),COUNT(DISTINCT CASE WHEN r.updated_at>=? AND json_extract(r.payload,'$[0].status') NOT IN ('provider_unavailable','unavailable') THEN n.commitment END) FROM public_notes n JOIN operations o ON o.id=n.operation_id LEFT JOIN remote_recognition r ON r.operation_id=o.id WHERE " + where + " AND " + e.successSQL()
@@ -104,6 +105,19 @@ func (e *Explorer) grant(ctx context.Context, q query, id string) (any, error) {
 		}
 	}
 	result := map[string]any{"id": q.hash, "chainId": q.chain, "protocolAddress": q.protocol, "tokenAddress": q.token, "payer": parts[3], "grantId": parts[4], "activities": page, "drawRecords": draws, "snapshot": page.Snapshot}
+	result["nextCursor"] = page.NextCursor
+	result["owner"] = parts[3]
+	result["historyStatus"] = "complete_at_indexed_head"
+	where, args := snapshotWhere(page.Snapshot)
+	args = append(args, q.chain, q.protocol, q.token)
+	var pending int64
+	pendingSQL := "SELECT COUNT(*) FROM operations o WHERE o.canonical=1 AND " + where + " AND o.chain_id=? AND o.protocol_address=? AND LOWER(" + e.extract("o.payload", "tokenAddress") + ")=? AND " + e.successSQL() + " AND " + e.extract("o.payload", "kind") + " IN ('createCredit','updateCredit','revokeCredit') AND COALESCE(" + e.extract("o.payload", "unsupportedReason") + ", '')='' AND COALESCE(CAST(" + e.extract("o.payload", "creditSlotIndexed") + " AS TEXT), 'false') NOT IN ('true','1')"
+	if err = e.db.QueryRowContext(ctx, e.sql(pendingSQL), args...).Scan(&pending); err != nil {
+		return nil, publicError("UNAVAILABLE")
+	}
+	if pending > 0 {
+		result["historyStatus"] = "backfilling"
+	}
 	if e.options.PublicState != nil {
 		anchor, err := chainAnchor(page.Snapshot, q.chain, q.protocol)
 		if err != nil {
@@ -118,9 +132,9 @@ func (e *Explorer) grant(ctx context.Context, q query, id string) (any, error) {
 		}
 		result["chainState"] = state
 		result["status"] = state.Status
-		if err = e.validateSnapshot(ctx, page.Snapshot); err != nil {
-			return nil, err
-		}
+	}
+	if err = e.validateSnapshot(ctx, page.Snapshot); err != nil {
+		return nil, err
 	}
 	return result, nil
 }

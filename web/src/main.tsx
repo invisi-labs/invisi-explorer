@@ -15,15 +15,21 @@ import {
   validateSearch,
   objectIdentity,
   statusKey,
+  showsSourceRecognition,
   collectionFor,
   type ApiError,
 } from "./public";
 import "./style.css";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
+import { AddressReference } from "./AddressReference";
 import { useCursorPagination } from "./useCursorPagination";
+import { CreditOperationPanel } from "./CreditOperationPanel";
+import { GrantHistory } from "./GrantHistory";
+import { isCreditOperation } from "./credit";
 import { FundingPanel } from "./FundingPanel";
-import { RecognitionSummary } from "./RecognitionSummary";
+import { SourceRecognition } from "./SourceRecognition";
+import { TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
 import { NetworkIcon } from "./NetworkIcon";
 import { DiagnosticsPanel, type DiagnosticsResponse } from "./DiagnosticsPanel";
 type RecordData = Record<string, any>;
@@ -130,10 +136,12 @@ function Address({
   value,
   kind,
   data,
+  internalHref,
 }: {
   value: string;
   kind?: "tx" | "address" | "token";
   data?: RecordData;
+  internalHref?: string;
 }) {
   const { metadata, t } = useContext(Context);
   const n = metadata.networks?.find(
@@ -143,39 +151,9 @@ function Address({
     n?.explorerBaseUrl ??
     n?.explorerUrl ??
     n?.explorerTxUrl?.replace(/\/tx\/?$/, "");
-  let url: string | undefined;
-  try {
-    if (base && kind && /^0x[0-9a-fA-F]+$/.test(value)) {
-      const parsed = new URL(base);
-      if (parsed.protocol === "https:")
-        url =
-          parsed.origin +
-          parsed.pathname.replace(/\/$/, "") +
-          "/" +
-          kind +
-          "/" +
-          value;
-    }
-  } catch {}
-  return (
-    <span className="address">
-      <code title={value}>{value}</code>
-      <Copy value={value} />
-      {url && (
-        <a
-          className="icon"
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("external")}
-          title={t("external")}
-        >
-          ↗
-        </a>
-      )}
-    </span>
-  );
+  return <AddressReference value={value} kind={kind} explorerUrl={base} internalHref={internalHref} t={t}/>;
 }
+
 function Status({ value }: { value: unknown }) {
   const { t } = useContext(Context);
   const raw = String(value ?? "UNKNOWN");
@@ -224,6 +202,7 @@ function objectHref(
   );
 }
 function RecognitionBadges({ data }: { data: RecordData }) {
+  const {t}=useContext(Context);
   const rows = Array.isArray(data.recognition)
     ? data.recognition
     : data.recognition
@@ -237,6 +216,7 @@ function RecognitionBadges({ data }: { data: RecordData }) {
             className="recognition-scope"
             key={i}
           >
+            {Number(data.operationCount)>1 && row.operationIndex!==undefined && <small>{t("operationNumber").replace("{number}",String(BigInt(row.operationIndex)+1n))}</small>}
             <Status value={row.status ?? row.recognitionState} />
           </span>
         ))
@@ -299,6 +279,7 @@ function Listing({
   }, []);
   const result = useCursorPagination<Page>("/" + type);
   const items = result.data?.items ?? [];
+  const identityLabel = t(type === "notes" ? "noteCommitmentLabel" : type === "credit-states" ? "creditCommitmentLabel" : type === "transactions" ? "transactionHashLabel" : type === "grants" ? "grantIdLabel" : "hash");
   return (
     <section className="card" aria-busy={result.loading}>
       <div className="section-head">
@@ -329,7 +310,7 @@ function Listing({
           <table>
             <thead>
               <tr>
-                <th>{t("hash")}</th>
+                <th>{identityLabel}</th>
                 <th>{t("network")}</th>
                 {type === "transactions" && (
                   <>
@@ -339,6 +320,7 @@ function Listing({
                     <th>{t("recognition")}</th>
                   </>
                 )}
+                {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("creditLatestAction")}</th></>}
                 {type === "notes" && <th>{t("recognition")}</th>}
                 <th>
                   <button className="plain" onClick={() => setFull((x) => !x)}>
@@ -364,14 +346,17 @@ function Listing({
                       if (id && !window.getSelection()?.toString()) nav(href);
                     }}
                   >
-                    <td data-label={t("hash")}>
+                    <td data-label={identityLabel}>
                       <Link to={href} onClick={(e) => e.stopPropagation()}>
                         <code>
-                          {id.length > 22
+                          {type === "grants" ? r.grantId : id.length > 22
                             ? id.slice(0, 12) + "…" + id.slice(-8)
                             : id || "—"}
                         </code>
                       </Link>
+                      {type === "grants" && <div className="grant-list-reference" onClick={event=>event.stopPropagation()}>
+                        <small>{t("grantOwner")}</small><Address value={r.payer} kind="address" data={r}/>
+                      </div>}
                     </td>
                     <td data-label={t("network")}>
                       <Network data={r} />
@@ -379,19 +364,15 @@ function Listing({
                     {type === "transactions" && (
                       <>
                         <td data-label={t("operation")}>
-                          {r.kind && r.kind in dictionaries.en
-                            ? t(r.kind as Key)
-                            : (r.kind ?? "—")}
+                          <TransactionOperationLabel data={r} t={t}/>
                         </td>
                         <td data-label={t("execution")}>
-                          <Status value={r.success} />
+                          <Status value={r.executionStatus ?? r.success} />
                         </td>
                         <td className="amount-cell" data-label={t("amount")}>
-                          {principal(r) !== undefined ? (
-                            <Amount value={principal(r)} data={r} compact />
-                          ) : (
-                            "—"
-                          )}
+                          <TransactionAmounts data={r}
+                            amount={(value,token)=><Amount value={value} data={{...r,tokenAddress:token}} compact/>}
+                            fallback={principal(r)!==undefined?<Amount value={principal(r)} data={r} compact/>:"—"}/>
                         </td>
                         <td
                           className="recognition-cell"
@@ -401,6 +382,11 @@ function Listing({
                         </td>
                       </>
                     )}
+                    {type === "grants" && <>
+                      <td data-label={t("token")}><div className="grant-list-reference" onClick={event=>event.stopPropagation()}><Address value={r.tokenAddress} kind="token" data={r}/></div></td>
+                      <td data-label={t("creditGrantStatus")}><span className={"badge " + (r.authorizationStatus === "active" ? "good" : "")}>{t(r.authorizationStatus === "active" ? "creditGrantActive" : r.authorizationStatus === "revoked" ? "creditGrantRevoked" : "fundingUnknown")}</span></td>
+                      <td data-label={t("creditLatestAction")}>{r.kind in dictionaries.en ? t(r.kind as Key) : r.kind}</td>
+                    </>}
                     {type === "notes" && (
                       <td
                         className="recognition-cell"
@@ -532,7 +518,7 @@ function Search() {
     </section>
   );
 }
-function PublicFields({ data }: { data: RecordData }) {
+function PublicFields({ data, showSourceTransaction = true, showNoteAmount = false }: { data: RecordData; showSourceTransaction?: boolean; showNoteAmount?: boolean }) {
   const { t } = useContext(Context);
   const known: [string, Key][] = [
     ["kind", "operation"],
@@ -541,12 +527,12 @@ function PublicFields({ data }: { data: RecordData }) {
     ["withdrawalAmount", "withdrawal"],
     ["feeAmount", "fee"],
     ["amount", "noteAmount"],
-    ["treeId", "trees"],
-    ["leafIndex", "technical"],
+    ["treeId", "treeIdLabel"],
+    ["leafIndex", "leafIndexLabel"],
     ["reason", "reason"],
   ];
   return (
-    <dl>
+    <dl className="public-fields">
       {"success" in data && (
         <>
           <dt>{t("execution")}</dt>
@@ -557,7 +543,7 @@ function PublicFields({ data }: { data: RecordData }) {
       )}{" "}
       {known.map(
         ([key, label]) =>
-          data[key] !== undefined && (
+          (data[key] !== undefined || (key === "amount" && showNoteAmount)) && !(isCreditOperation(data.kind) && ["withdrawalAmount", "feeAmount"].includes(key)) && (
             <React.Fragment key={key}>
               <dt>{t(label)}</dt>
               <dd>
@@ -566,7 +552,7 @@ function PublicFields({ data }: { data: RecordData }) {
                 ) : ["amount", "withdrawalAmount", "feeAmount"].includes(
                     key,
                   ) ? (
-                  <Amount value={data[key]} data={data} />
+                  data[key] === undefined ? <span className="muted">{t("notPublic")}</span> : <Amount value={data[key]} data={data} />
                 ) : key === "kind" && data[key] in dictionaries.en ? (
                   t(data[key] as Key)
                 ) : (
@@ -600,24 +586,44 @@ function PublicFields({ data }: { data: RecordData }) {
           </dd>
         </>
       )}
-      {(data.txHash ?? data.transactionHash) && (
+      {showSourceTransaction && (data.txHash ?? data.transactionHash) && (
         <>
           <dt>{t("sourceTransaction")}</dt>
           <dd>
-            <Link
-              to={objectHref(
-                "transactions",
-                data,
-                data.txHash ?? data.transactionHash,
-              )}
-            >
-              {data.txHash ?? data.transactionHash}
-            </Link>
+            <Address
+              value={data.txHash ?? data.transactionHash}
+              kind="tx"
+              data={data}
+              internalHref={objectHref("transactions", data, data.txHash ?? data.transactionHash)}
+            />
           </dd>
         </>
       )}
     </dl>
   );
+}
+function GrantDetail({id}: {id: string}) {
+  const {t} = useContext(Context);
+  const result = useCursorPagination<RecordData>("/grants/" + encodeURIComponent(id));
+  const data = result.data;
+  return <>
+    <p><Link to="/grants">{t("grants")}</Link> /</p>
+    <h1>{t("creditHistory")}</h1>
+    {!data ? <section className="card"><State {...result}/></section> : <>
+      {result.notice && <p className="pagination-message" role="status">{t(result.notice === "updated" ? "paginationUpdated" : "paginationRestarted")}</p>}
+      {result.error && <p role="alert">{t("unavailable")} <button onClick={result.retry}>{t("retry")}</button></p>}
+      <GrantHistory data={data} network={<Network data={data}/>} t={t}
+        address={(value,kind)=><Address value={value} kind={kind ?? "address"} data={data}/>}
+        transaction={row=><Address value={row.txHash} kind="tx" data={row} internalHref={objectHref("transactions",row,row.txHash)}/>}
+        amount={(value,row)=><Amount value={value} data={row}/>}
+        href={(collection,row,value)=>objectHref(collection,row,value)}/>
+      <div className="pagination">
+        <span>{t("paginationSummary").replace("{total}",String(data.activities?.total ?? 0)).replace("{page}",String(result.page))}</span>
+        <div><button disabled={result.loading || result.page === 1} onClick={result.previous}>{t("previous")}</button>
+        <button disabled={result.loading || !!result.error || !data.nextCursor} onClick={result.next}>{t("next")}</button></div>
+      </div>
+    </>}
+  </>;
 }
 function Detail({ type, id }: { type: string; id: string }) {
   const { t, metadata } = useContext(Context);
@@ -629,17 +635,15 @@ function Detail({ type, id }: { type: string; id: string }) {
   const operations = data?.indexAnomaly
     ? []
     : (data?.operations ?? data?.activities?.items ?? (data ? [data] : []));
-  const recognition = Array.isArray(data?.recognition)
-    ? data.recognition
-    : data?.recognition && typeof data.recognition === "object"
-      ? [data.recognition]
-      : [];
+  const aggregate = type === "transactions" && operations.length > 1;
+  const showRecognition = !aggregate && showsSourceRecognition(type, data);
   return (
     <>
       <p>
-        <Link to={"/" + type}>{t(type as Key)}</Link> /
+        <Link to={type === "credit-states" ? "/grants" : "/" + type}>{t(type === "credit-states" ? "grants" : type as Key)}</Link> /
       </p>
       <h1>{t(type as Key)}</h1>
+      {aggregate && <p className="muted">{t("aggregate")} · {t("operationCount").replace("{count}",String(operations.length))}</p>}
       <div className="detail-hash">
         <Address
           value={id}
@@ -652,7 +656,7 @@ function Detail({ type, id }: { type: string; id: string }) {
           <State {...result} />
         </section>
       ) : (
-        <div className="detail-grid">
+        <div className={showRecognition ? "detail-grid" : "detail-grid detail-grid-single"}>
           <div>
             {data?.indexAnomaly && (
               <section className="card">
@@ -665,11 +669,15 @@ function Detail({ type, id }: { type: string; id: string }) {
             {operations.map((op: RecordData, i: number) => (
               <section className="card" key={i}>
                 <h2>
-                  {t("publicInfo")}
-                  {operations.length > 1 ? " · " + (i + 1) : ""}
+                  {aggregate ? t("operationNumber").replace("{number}",String(BigInt(op.operationIndex ?? i)+1n)) + " · " + (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind) : t("publicInfo")}
                 </h2>
-                <PublicFields data={op} />
-                {((Array.isArray(op.funding) && op.funding.length > 0) ||
+                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} />
+                {aggregate && <SourceRecognition data={op} t={t} status={value=><Status value={value}/>}/>}
+                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} t={t}
+                  address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}
+                  amount={(value, token) => <Amount value={value} data={{...op, tokenAddress:token}}/>}
+                  href={(collection, value) => objectHref(collection,op,value)}/>}
+                {!isCreditOperation(op.kind) && (type === "transactions" || (Array.isArray(op.funding) && op.funding.length > 0) ||
                   op.fundingEvidence ||
                   op.routerFunding ||
                   op.executionContext ||
@@ -688,37 +696,28 @@ function Detail({ type, id }: { type: string; id: string }) {
                     )}
                   />
                 )}
-                {type === "notes" && op.amount === undefined && (
-                  <p>
-                    {t("noteAmount")}: {t("notPublic")}
-                  </p>
-                )}
                 {op.noteOutputs?.length > 0 && (
                   <>
-                    <h3>
-                      {t("outputs")} · {op.noteOutputs.length} Note
-                    </h3>
-                    {op.noteOutputs.map((note: RecordData, j: number) => (
-                      <div className="output" key={j}>
-                        <Link to={objectHref("notes", op, note.noteCommitment)}>
-                          <code>{note.noteCommitment}</code>
-                        </Link>
-                        <Copy value={note.noteCommitment} />
-                        <p>
-                          {note.amount === undefined ? (
-                            t("notPublic")
-                          ) : (
-                            <Amount value={note.amount} data={op} />
-                          )}
-                        </p>
-                        <p>
-                          treeId: {note.treeId} · leafIndex: {note.leafIndex}
-                        </p>
-                      </div>
-                    ))}
+                    <h3>{t("noteOutputsCount").replace("{count}", String(op.noteOutputs.length))}</h3>
+                    <div className="table-wrap note-outputs-wrap">
+                      <table className="note-outputs-table">
+                        <thead><tr>
+                          <th>{t("noteCommitmentLabel")}</th><th>{t("outputAmount")}</th>
+                          <th>{t("treeIdLabel")}</th><th>{t("leafIndexLabel")}</th>
+                        </tr></thead>
+                        <tbody>{op.noteOutputs.map((note: RecordData, j: number) => (
+                          <tr key={note.noteCommitment ?? j}>
+                            <td data-label={t("noteCommitmentLabel")}><Address value={note.noteCommitment} data={op} internalHref={objectHref("notes", op, note.noteCommitment)}/></td>
+                            <td data-label={t("outputAmount")}>{note.amount === undefined ? t("notPublic") : <Amount value={note.amount} data={op}/>}</td>
+                            <td data-label={t("treeIdLabel")}>{note.treeId == null ? "—" : <Link to={objectHref("trees", op, "protocol:" + note.treeId)}>{note.treeId}</Link>}</td>
+                            <td data-label={t("leafIndexLabel")}>{note.leafIndex ?? "—"}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
                   </>
                 )}
-                {(op.draws ?? op.drawRecords)?.length > 0 && (
+                {!(type === "transactions" && isCreditOperation(op.kind)) && (op.draws ?? op.drawRecords)?.length > 0 && (
                   <>
                     <h3>{t("drawRecords")}</h3>
                     {(op.draws ?? op.drawRecords).map(
@@ -752,7 +751,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                     )}
                   </>
                 )}
-                {op.creditOutputs?.map((credit: RecordData, j: number) => (
+                {!isCreditOperation(op.kind) && op.creditOutputs?.map((credit: RecordData, j: number) => (
                   <p key={j}>
                     <Link
                       to={objectHref(
@@ -765,7 +764,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                     </Link>
                   </p>
                 ))}
-                {op.grantRefs?.map((grant: RecordData, j: number) => (
+                {!isCreditOperation(op.kind) && op.grantRefs?.map((grant: RecordData, j: number) => (
                   <p key={j}>
                     <Link
                       to={
@@ -795,38 +794,9 @@ function Detail({ type, id }: { type: string; id: string }) {
               </details>
             </section>
           </div>
-          <aside>
-            <section className="card">
-              <h2>{t("recognition")}</h2>
-              {type === "credit-states" ? (
-                <p className="muted">—</p>
-              ) : recognition.length ? (
-                recognition.map((r: RecordData, i: number) => (
-                  <div key={i}>
-                    {operations.length > 1 &&
-                      r.operationIndex !== undefined && (
-                        <p className="muted">
-                          {t("operation")}{" "}
-                          {String(BigInt(r.operationIndex) + 1n)}
-                        </p>
-                      )}
-                    <RecognitionSummary
-                      data={r}
-                      t={t}
-                      status={(value) => <Status value={value} />}
-                    />
-                    <details>
-                      <summary>{t("recognitionDetails")}</summary>
-                      <pre>{JSON.stringify(r, null, 2)}</pre>
-                    </details>
-                  </div>
-                ))
-              ) : (
-                <Status value={data?.recognitionStatus ?? data?.status} />
-              )}
-              <p className="muted">{t("privacy")}</p>
-            </section>
-          </aside>
+          {showRecognition && <aside>
+            <SourceRecognition data={data ?? {}} t={t} status={value=><Status value={value}/>} aside/>
+          </aside>}
         </div>
       )}
     </>
@@ -840,11 +810,11 @@ function TransactionsPage() {
       <h1>{t("transactions")}</h1>
       <Search />
       <div className="stats">
-        {(["transactions", "notes", "credit-states"] as const).map((key) => (
+        {(["transactions", "notes", "grants"] as const).map((key) => (
           <Link className="card" to={key === "transactions" ? "/" : "/" + key} key={key}>
             <span>{t(key)}</span>
             <strong>
-              {result.data?.[key === "credit-states" ? "creditStates" : key] ??
+              {result.data?.[key] ??
                 "—"}
             </strong>
           </Link>
@@ -944,11 +914,11 @@ function App() {
           <LanguagePicker language={language} onChange={setLanguage} label={t("language")} />
         </div>
         <nav aria-label={t("all")}>
-          {routes.map((r) => (
+          {routes.filter(r=>r!=="credit-states").map((r) => (
             <Link
               key={r}
               to={r === "transactions" ? "/" : "/" + r}
-              aria-current={type === r || (!type && r === "transactions") ? "page" : undefined}
+              aria-current={type === r || (type === "credit-states" && r === "grants") || (!type && r === "transactions") ? "page" : undefined}
             >
               {t(r)}
             </Link>
@@ -968,7 +938,9 @@ function App() {
         ) : routes.includes(type as Key) ||
           type === "addresses" ||
           type === "commitments" ? (
-          id ? (
+          id ? type === "grants" ? (
+            <GrantDetail key={location.pathname + location.search} id={decodeURIComponent(id)}/>
+          ) : (
             <Detail
               key={location.pathname + location.search}
               type={type}

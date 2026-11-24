@@ -185,11 +185,15 @@ code { font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow-wrap:
 .state[role='alert'] { background: var(--surface); border-radius: 14px; }
 .state button { margin: 8px; }
 .detail-hash { margin: -6px 0 20px; }
-.address { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; }
+.address { display: inline-flex; gap: 8px; align-items: center; max-width: 100%; min-width: 0; vertical-align: middle; }
+.address-value { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; word-break: break-all; }
+.address-actions { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+.address-actions .icon { width: 28px; height: 28px; min-height: 28px; border-radius: 6px; }
 .address code { min-width: 0; }
 .icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; padding: 0; background: transparent; font-size: 20px; color: var(--secondary); }
 .detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; gap: 20px; }
 .detail-grid > * { min-width: 0; }
+.detail-grid-single { grid-template-columns: minmax(0, 1fr); }
 dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px 20px; margin: 0; }
 dt { color: var(--secondary); }
 dd { margin: 0; overflow-wrap: anywhere; }
@@ -227,8 +231,6 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
   dd { margin-bottom: 10px; }
   footer { padding: 16px; flex-wrap: wrap; }
   .pagination { flex-wrap: wrap; }
-  .address { flex-wrap: wrap; }
-  .address code, .detail-hash .address code { flex: 1 1 100%; }
   .icon { font-size: 18px; }
   .mobile-time { display: inline-block; margin-left: auto; }
   .table-wrap { overflow: visible; }
@@ -293,9 +295,9 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
 .funding-roles dt { color: var(--secondary); font-size: 12px; }
 .funding-role + .funding-role { margin-top: 12px; }
 .funding-role > div { margin-top: 4px; font-size: 12px; }
-.funding-panel .address { flex-wrap: wrap; max-width: 100%; }
+.funding-panel .address { max-width: 100%; }
 .funding-panel code, .funding-panel .amount-value { overflow-wrap: anywhere; word-break: break-word; }
-.funding-panel .address code { flex: 1 1 100%; font-size: 11px; }
+.funding-panel .address code { font-size: 11px; }
 .funding-panel .address .icon { min-width: 28px; min-height: 28px; }
 .funding-table { table-layout: fixed; width: 100%; }
 .funding-table th, .funding-table td { vertical-align: top; padding: 10px 8px; white-space: normal; }
@@ -330,3 +332,61 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
 .amount-number:hover .amount-tooltip, .amount-number:focus .amount-tooltip { display: block; }
 @media (max-width: 767px) { .amount-copy { width: 44px; height: 44px; min-height: 44px; } }
 .pagination-message { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px; color: var(--secondary); font-size: 13px; }
+
+.leaf-position { margin: 12px 0 0; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; font-size: 12px; }
+.leaf-position dd { margin: 0; }
+
+.public-fields { align-items: center; }
+@media (pointer: coarse) {
+  .address-actions .icon { width: 44px; height: 44px; min-height: 44px; }
+}
+
+.funding-payment { grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; align-items: center; }
+.funding-payment > dd { min-width: 0; margin: 0; }
+
+.note-outputs-table { width: 100%; table-layout: fixed; margin-top: 12px; }
+.note-outputs-table th, .note-outputs-table td { text-align: left; padding: 10px 8px; white-space: normal; vertical-align: middle; }
+.note-outputs-table th:first-child { width: 48%; }
+.note-outputs-table th:nth-child(2) { width: 28%; }
+.note-outputs-table th:nth-child(3), .note-outputs-table th:nth-child(4) { width: 12%; }
+.note-outputs-table .address { display: flex; }
+.note-outputs-table .address-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: normal; }
+@media (max-width: 767px) {
+  .note-outputs-table, .note-outputs-table tbody, .note-outputs-table tr, .note-outputs-table td { display: block; width: 100%; }
+  .note-outputs-table thead { display: none; }
+  .note-outputs-table tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .note-outputs-table td { border: 0; padding: 4px 0; }
+  .note-outputs-table td::before { content: attr(data-label); display: block; color: var(--secondary); font-size: 11px; margin-bottom: 4px; }
+}
+
+.credit-operation { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 12px; }
+.credit-operation h4 { margin: 24px 0 12px; }
+.credit-slot, .credit-payer { margin: 12px 0; padding: 16px; background: var(--surface); border-radius: 12px; }
+.credit-slot dl { margin-top: 0; }
+.credit-outputs-table { table-layout: fixed; }
+.credit-outputs-table th:first-child { width: 68%; }
+.credit-outputs-table td:first-child a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.credit-history { list-style: none; margin: 24px 0 0; padding: 0; }
+.credit-history-item { border-top: 1px solid var(--line); padding: 20px 0; }
+.credit-history-item h3 { margin: 0; }
+.credit-history-item time { color: var(--muted); font-size: 14px; }
+.credit-history-item code { overflow-wrap: anywhere; }
+
+.credit-operation p code { overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .credit-outputs-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .credit-outputs-table td:first-child { grid-column: 1 / -1; }
+  .credit-outputs-table td:last-child { grid-column: auto; }
+}
+
+.credit-state-reference { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.credit-state-reference a { flex: 1; min-width: 0; }
+.credit-state-reference button { flex: none; }
+
+.operation-count { display: block; color: var(--secondary); font-size: 12px; margin-top: 4px; }
+.operation-recognition { margin: 20px 0; border-top: 1px solid var(--line); padding-top: 12px; }
+.recognition-scope small { color: var(--secondary); font-size: 11px; }
+
+.grant-list-reference { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; margin-top: 6px; }
+.grant-list-reference small { color: var(--secondary); font-size: 11px; }
+.grant-list-reference .address-value { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

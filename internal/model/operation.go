@@ -38,6 +38,7 @@ type NoteOutput struct {
 	Clue           string  `json:"clue,omitempty"`
 }
 type Operation struct {
+	CreditSlotIndexed   bool              `json:"creditSlotIndexed,omitempty"`
 	ExecutionContext    *ExecutionContext `json:"executionContext,omitempty"`
 	ExecutionPath       string            `json:"executionPath,omitempty"`
 	FundingEvidence     *FundingEvidence  `json:"fundingEvidence,omitempty"`

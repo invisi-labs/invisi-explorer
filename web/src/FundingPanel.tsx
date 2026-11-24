@@ -29,6 +29,8 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
   const view = fundingView(operation);
   const [expanded, setExpanded] = useState(false);
   const transfers = expanded ? view.transfers : view.transfers.slice(0, 12);
+  const withdrawalKnown = typeof operation.withdrawalAmount === "string" && /^(0|[1-9][0-9]{0,77})$/.test(operation.withdrawalAmount);
+  const hasWithdrawal = withdrawalKnown && BigInt(operation.withdrawalAmount as string) > 0n;
   const asset = (token: string) =>
     token.toLowerCase() === zero ? t("fundingNative") : address(token, "token");
   return (
@@ -81,20 +83,32 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
               {view.coreFunding.length
                 ? view.coreFunding.map((funding, index) => (
                     <div className="funding-role" key={index}>
-                      {address(funding.payer, "address")}
-                      <div>
-                        {asset(funding.tokenAddress)} ·{" "}
-                        {amount(funding.amount, funding.tokenAddress)}
-                      </div>
+                      <dl className="funding-payment">
+                        <dt>{t("fundingPaymentAddress")}</dt>
+                        <dd>{address(funding.payer, "address")}</dd>
+                        <dt>{t("fundingPaymentToken")}</dt>
+                        <dd>{asset(funding.tokenAddress)}</dd>
+                        <dt>{t("fundingPaymentAmount")}</dt>
+                        <dd>{amount(funding.amount, funding.tokenAddress)}</dd>
+                      </dl>
                     </div>
                   ))
-                : t("fundingUnknown")}
+                : Array.isArray(operation.funding) && !operation.unsupportedReason ? t("fundingNoDeposit") : t("fundingUnknown")}
             </dd>
+            <dt>{t("fundingWithdrawal")}</dt>
+            <dd>{hasWithdrawal ? <dl className="funding-payment">
+              <dt>{t("fundingWithdrawalAddress")}</dt>
+              <dd>{typeof operation.withdrawalAddress === "string" && /^0x[0-9a-fA-F]{40}$/.test(operation.withdrawalAddress) ? address(operation.withdrawalAddress, "address") : t("fundingUnknown")}</dd>
+              <dt>{t("fundingPaymentToken")}</dt>
+              <dd>{typeof operation.tokenAddress === "string" ? asset(operation.tokenAddress) : t("fundingUnknown")}</dd>
+              <dt>{t("fundingWithdrawalAmount")}</dt>
+              <dd>{amount(operation.withdrawalAmount as string, String(operation.tokenAddress ?? ""))}</dd>
+            </dl> : withdrawalKnown ? t("fundingNoWithdrawal") : t("fundingUnknown")}</dd>
             <dt>{t("fundingCaller")}</dt>
             <dd>
               {view.calls.length
                 ? address(view.calls[view.calls.length - 1].from, "address")
-                : t("fundingUnknown")}
+                : view.directCoreCall ? t("fundingDirectCore") : t("fundingUnknown")}
             </dd>
             <dt>{t("fundingSubmitter")}</dt>
             <dd>
@@ -103,6 +117,8 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
                 : t("fundingUnknown")}
               <p className="muted">{t("fundingSubmitterCaveat")}</p>
             </dd>
+            <dt>{t("fundingTransactionTo")}</dt>
+            <dd>{view.transactionTo ? address(view.transactionTo, "address") : t("fundingUnknown")}</dd>
             {typeof operation.feeRecipient === "string" &&
               operation.feeRecipient !== zero &&
               typeof operation.feeAmount === "string" &&
@@ -116,14 +132,10 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
             <dd>
               {view.is7702Transaction ? (
                 <strong>EIP-7702 · {t("fundingType")} 4</strong>
-              ) : (
-                t("funding7702Unknown")
-              )}
-              {view.transactionType && !view.is7702Transaction && (
-                <p className="muted">
-                  {t("fundingType")} {view.transactionType}
-                </p>
-              )}
+              ) : view.transactionType !== null ? (
+                t("fundingRegularTransaction").replace("{type}", view.transactionType)
+              ) : t("funding7702Unknown")}
+              {view.is7702Transaction && <p className="muted">{t("fundingAuthorizationCaveat")}</p>}
             </dd>
           </dl>
           {view.transfers.length > 0 && (

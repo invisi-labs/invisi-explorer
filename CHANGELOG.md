@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.4
+
+- Present credit creation, updates, draws and revocations with operation-specific public fields. Automatically backfill canonical grant identity and group fixed grant slots into one entity with paginated action/state history. Keep private policy and balances undisclosed and distinguish shared payer amounts.
+- Paginate transaction instances rather than operation rows, with aggregate operation counts, per-operation detail recognition, mixed execution outcomes and separate per-token public funding totals. Preserve scoped snapshots and restart legacy cursors.
+- Bind optional transaction sender/type/recipient observations to indexed receipts and fresh canonical headers. Derive public withdrawal recipients only from authenticated statements, retain evidence uncertainty, and expose public transfer execution data across transaction kinds.
+- Align copy/explorer actions, Note/Credit output tables, localized tree positions, source-recognition applicability and private Note amount layout. Consolidate primary grant navigation and distinct grant statistics.
+
 ## 1.3.3
 
 - Discover ERC-20 tokens in public history and funding transfers; read symbol and decimals through finalized Protocol RPC calls and persist an independent Explorer metadata cache. Preserve configured overrides, unknown precision and retry behavior without interrupting indexing.

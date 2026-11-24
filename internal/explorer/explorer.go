@@ -24,16 +24,17 @@ import (
 )
 
 type Options struct {
-	PublicState      PublicState
-	Dialect          string
-	CursorKey        []byte
-	Metadata         any
-	MetadataProvider func(context.Context) (any, error)
-	Scopes           []p.Scope
-	Recognition      func(context.Context, model.Operation) (any, error)
-	NoteRecognition  func(context.Context, string, string, p.Field) (any, error)
-	Roots            func(context.Context) (any, error)
-	Diagnostics      func(context.Context) (any, error)
+	TransactionObservation func(context.Context, model.Operation) (*model.TransactionObservation, error)
+	PublicState            PublicState
+	Dialect                string
+	CursorKey              []byte
+	Metadata               any
+	MetadataProvider       func(context.Context) (any, error)
+	Scopes                 []p.Scope
+	Recognition            func(context.Context, model.Operation) (any, error)
+	NoteRecognition        func(context.Context, string, string, p.Field) (any, error)
+	Roots                  func(context.Context) (any, error)
+	Diagnostics            func(context.Context) (any, error)
 }
 type Explorer struct {
 	db        *sql.DB
@@ -417,6 +418,16 @@ func snapshotWhere(s Snapshot) (string, []any) {
 	return "(" + strings.Join(clauses, " OR ") + ")", args
 }
 func filterHash(route string, q query) string {
+	// Transaction cursors formerly positioned individual operations.
+	if route == "transactions" {
+		route = "transactions-grouped-v1"
+	}
+	if route == "grants" && q.hash == "" {
+		route = "grants-entities-v1"
+	}
+	return filterDigest(route, q)
+}
+func filterDigest(route string, q query) string {
 	body, _ := json.Marshal([]any{route, q.chain, q.protocol, q.kind, q.token, q.namespace, q.hash, q.address, q.limit, q.history, q.onlyOrphans})
 	h := sha256.Sum256(body)
 	return hex.EncodeToString(h[:])
@@ -456,7 +467,13 @@ func (e *Explorer) pageContext(ctx context.Context, route string, q query) (Snap
 		return Snapshot{}, nil, publicError("INVALID_PARAMS")
 	}
 	var c cursor
-	if json.Unmarshal(body, &c) != nil || c.Version != 1 || c.Route != route || c.Filter != filterHash(route, q) {
+	if json.Unmarshal(body, &c) != nil || c.Version != 1 || c.Route != route {
+		return Snapshot{}, nil, publicError("INVALID_PARAMS")
+	}
+	if c.Filter != filterHash(route, q) {
+		if (route == "transactions" || route == "grants" && q.hash == "") && c.Filter == filterDigest(route, q) {
+			return Snapshot{}, nil, publicError("CONFLICT")
+		}
 		return Snapshot{}, nil, publicError("INVALID_PARAMS")
 	}
 	restored, err := e.snapshotAt(ctx, q, c.Heads)

@@ -67,6 +67,7 @@ export interface FundingView {
   calls: ExecutionCall[];
   authorizations: ExecutionAuthorization[];
   is7702Transaction: boolean;
+  directCoreCall: boolean;
   coverage: FundingCoverage;
   transfers: FundingTransfer[];
   warnings: FundingWarning[];
@@ -229,11 +230,22 @@ export function fundingView(input: unknown): FundingView {
     } else warnings.add("invalid-evidence");
   }
   if (authorizations.length) warnings.add("authorization-not-execution-proof");
-  const transactionType = uint(context.transactionType)
-    ? context.transactionType
-    : null;
+  const observation = object(op.transactionObservation);
+  const observed = observation.chainId === op.chainId &&
+    address(observation.protocolAddress) === address(op.protocolAddress) &&
+    typeof op.txHash === "string" && String(observation.txHash).toLowerCase() === op.txHash.toLowerCase() &&
+    typeof op.blockHash === "string" && String(observation.blockHash).toLowerCase() === op.blockHash.toLowerCase() &&
+    observation.blockNumber === op.blockNumber;
+  const observedSender = observed ? address(observation.transactionSender) : null;
+  const observedTo = observed ? address(observation.transactionTo) : null;
+  const observedType = observed && uint(observation.transactionType) ? observation.transactionType : null;
+  const transactionType = uint(context.transactionType) ? context.transactionType : observedType;
   const contextSender = address(context.transactionSender),
     evidenceSender = address(evidence.transactionSender);
+  if ((observedSender && contextSender && observedSender !== contextSender) ||
+      (observedSender && evidenceSender && observedSender !== evidenceSender) ||
+      (observedType && uint(context.transactionType) && observedType !== context.transactionType) ||
+      (observedTo && address(context.transactionTo) && observedTo !== address(context.transactionTo))) warnings.add("context-conflict");
   const contextPath = path(context.coreCallPath) ? context.coreCallPath : null;
   const evidencePath = path(evidence.coreCallPath)
     ? evidence.coreCallPath
@@ -310,8 +322,8 @@ export function fundingView(input: unknown): FundingView {
     fundedBy: sourceCandidates.map((s) => s.address),
     intermediaries,
     observedAddresses,
-    submitter: contextSender ?? evidenceSender,
-    transactionTo: address(context.transactionTo),
+    submitter: contextSender ?? evidenceSender ?? observedSender,
+    transactionTo: address(context.transactionTo) ?? observedTo,
     transactionType,
     coreCallPath:
       contextPath ??
@@ -320,6 +332,7 @@ export function fundingView(input: unknown): FundingView {
     calls,
     authorizations,
     is7702Transaction: transactionType === "4",
+    directCoreCall: rolesConfirmed && observedTo !== null && observedTo === address(op.protocolAddress),
     coverage,
     transfers,
     warnings: [...warnings],

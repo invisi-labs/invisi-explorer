@@ -318,3 +318,18 @@ describe("public funding roles", () => {
     expect(duplicate.warnings).toContain("invalid-evidence");
   });
 });
+
+it("fills outer transaction facts without inventing trace evidence",()=>{
+ const txHash="0x"+"a".repeat(64),blockHash="0x"+"b".repeat(64);
+ const op={canonical:true,success:true,chainId:"97",protocolAddress:CORE,txHash,blockHash,blockNumber:"42",funding:[{payer:SOURCE,tokenAddress:TOKEN,amount:"1"}],transactionObservation:{chainId:"97",protocolAddress:CORE,txHash,blockHash,blockNumber:"42",transactionType:"2",transactionTo:CORE,transactionSender:GAS}};
+ const view=fundingView(op);
+ expect(view.submitter).toBe(GAS);
+ expect(view.transactionType).toBe("2");
+ expect(view.directCoreCall).toBe(true);
+ expect(view.calls).toEqual([]);
+ expect(view.sourceCandidates).toEqual([]);
+ expect(view.warnings).toContain("evidence-unavailable");
+ const wrong=fundingView({...op,transactionObservation:{...op.transactionObservation,txHash:"0x"+"c".repeat(64)}});
+ expect(wrong.submitter).toBeNull();
+ expect(wrong.directCoreCall).toBe(false);
+});
