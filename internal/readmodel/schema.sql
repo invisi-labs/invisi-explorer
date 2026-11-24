@@ -24,3 +24,5 @@ CREATE TABLE IF NOT EXISTS recognition_requests(operation_id TEXT PRIMARY KEY,re
 CREATE INDEX IF NOT EXISTS remote_recognition_age ON remote_recognition(updated_at,operation_id);
 CREATE INDEX IF NOT EXISTS operations_public_time ON operations(substr('00000000000000000000'||json_extract(payload,'$.timestamp'),-20),id);
 CREATE TABLE IF NOT EXISTS root_backfill(scope TEXT PRIMARY KEY,epoch TEXT NOT NULL,next_generation TEXT NOT NULL,after_sequence TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS token_metadata(chain_id TEXT NOT NULL,address TEXT NOT NULL,symbol TEXT NOT NULL DEFAULT '',decimals INTEGER CHECK(decimals BETWEEN 0 AND 255),retry_at INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(chain_id,address));
+CREATE INDEX IF NOT EXISTS token_metadata_retry ON token_metadata(chain_id,retry_at,address);

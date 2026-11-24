@@ -317,3 +317,16 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
   .funding-table tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
   .funding-table td { border: 0; padding: 4px 0; text-align: left; }
 }
+
+.amount-line { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.amount-value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.amount-number[tabindex]:focus-visible { outline: 2px solid var(--purple-ink); outline-offset: 3px; border-radius: 3px; }
+.amount-token { overflow-wrap: anywhere; }
+.amount-copy { width: 32px; height: 32px; min-height: 32px; font-size: 14px; border: 0; border-radius: 6px; }
+.amount-copy:hover, .amount-copy:focus-visible { color: var(--purple-ink); background: var(--surface); }
+
+.amount-number { position: relative; display: inline-block; min-width: 0; }
+.amount-tooltip { display: none; position: absolute; z-index: 10; bottom: calc(100% + 8px); left: 0; width: max-content; max-width: min(360px, calc(100vw - 96px)); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 12px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; box-shadow: 0 4px 16px #00000014; }
+.amount-number:hover .amount-tooltip, .amount-number:focus .amount-tooltip { display: block; }
+@media (max-width: 767px) { .amount-copy { width: 44px; height: 44px; min-height: 44px; } }
+.pagination-message { display: flex; align-items: center; gap: 12px; margin: 8px 0 16px; color: var(--secondary); font-size: 13px; }

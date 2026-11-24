@@ -45,7 +45,12 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, e
 	}
-	return &Store{db}, nil
+	s := &Store{db}
+	if e = s.backfillTokenDiscovery(context.Background()); e != nil {
+		db.Close()
+		return nil, e
+	}
+	return s, nil
 }
 func (s *Store) Close() error { return s.DB.Close() }
 func pad(v string) string     { n, _ := strconv.ParseUint(v, 10, 64); return fmt.Sprintf("%020d", n) }
@@ -93,6 +98,9 @@ func project(ctx context.Context, tx *sql.Tx, op model.Operation) error {
 	id := op.ID()
 	_, e := tx.ExecContext(ctx, "INSERT INTO operations(id,chain_id,protocol_address,block_number,block_hash,tx_hash,operation_index,canonical,payload) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET canonical=1,payload=excluded.payload", id, op.ChainID, op.ProtocolAddress, pad(op.BlockNumber), op.BlockHash, op.TxHash, pad(op.OperationIndex), 1, string(b))
 	if e != nil {
+		return e
+	}
+	if e = discoverTokens(ctx, tx, op); e != nil {
 		return e
 	}
 	for _, table := range []string{"public_notes", "public_credit_states", "public_nullifiers", "public_grant_ids"} {

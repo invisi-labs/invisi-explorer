@@ -12,7 +12,6 @@ import {
   request,
   fullTime,
   age,
-  exactAmount,
   validateSearch,
   objectIdentity,
   statusKey,
@@ -20,6 +19,9 @@ import {
   type ApiError,
 } from "./public";
 import "./style.css";
+import { CopyButton } from "./CopyButton";
+import { AmountDisplay } from "./AmountDisplay";
+import { useCursorPagination } from "./useCursorPagination";
 import { FundingPanel } from "./FundingPanel";
 import { RecognitionSummary } from "./RecognitionSummary";
 import { NetworkIcon } from "./NetworkIcon";
@@ -46,7 +48,7 @@ const routes: Key[] = [
   "diagnostics",
   "broadcasters",
 ];
-function useData<T>(path: string) {
+function useData<T>(path: string, refreshMs = 0) {
   const [state, set] = useState<{
     data?: T;
     error?: ApiError;
@@ -56,14 +58,19 @@ function useData<T>(path: string) {
   const [retry, bump] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    set({ loading: true });
+    set(previous => refreshMs && previous.data ? { ...previous, error: undefined } : { loading: true });
     request<T>(path, controller.signal)
       .then((data) => set({ data, loading: false, fetchedAt: Date.now() }))
       .catch((error) => {
-        if (!controller.signal.aborted) set({ error, loading: false });
+        if (!controller.signal.aborted) set(previous => refreshMs && previous.data ? { ...previous, error, loading: false } : { error, loading: false });
       });
     return () => controller.abort();
-  }, [path, retry]);
+  }, [path, retry, refreshMs]);
+  useEffect(() => {
+    if (!refreshMs) return;
+    const timer = setInterval(() => bump(x => x + 1), refreshMs);
+    return () => clearInterval(timer);
+  }, [refreshMs]);
   return { ...state, retry: () => bump((x) => x + 1) };
 }
 function State({
@@ -86,6 +93,8 @@ function State({
         ? "notIndexed"
         : ["REORG", "CHAIN_REORGED"].includes(error?.code ?? "")
           ? "reorg"
+          : error?.code === "CONFLICT"
+            ? "paginationChanging"
           : error?.code === "PROVIDER_UNAVAILABLE"
             ? "providerUnavailable"
             : "unavailable";
@@ -103,31 +112,7 @@ function State({
 }
 function Copy({ value }: { value: string }) {
   const { t } = useContext(Context);
-  const [message, set] = useState("");
-  return (
-    <>
-      <button
-        className="icon"
-        aria-label={t("copy")}
-        title={t("copy")}
-        onClick={async (e) => {
-          e.stopPropagation();
-          try {
-            await navigator.clipboard.writeText(value);
-            set(t("copied"));
-          } catch {
-            set(t("copyFailed"));
-          }
-          setTimeout(() => set(""), 2000);
-        }}
-      >
-        ⧉
-      </button>
-      <span className="sr" aria-live="polite">
-        {message}
-      </span>
-    </>
-  );
+  return <CopyButton value={value} t={t}/>;
 }
 function Network({ data }: { data: RecordData }) {
   const { metadata, t } = useContext(Context);
@@ -262,32 +247,20 @@ function RecognitionBadges({ data }: { data: RecordData }) {
   );
 }
 
-function Amount({ value, data }: { value: unknown; data: RecordData }) {
+function Amount({ value, data, compact = false }: { value: unknown; data: RecordData; compact?: boolean }) {
   const { metadata, t } = useContext(Context);
   const token = metadata.tokens?.find(
     (r: RecordData) =>
       String(r.chainId) === String(data.chainId) &&
       r.address?.toLowerCase() === data.tokenAddress?.toLowerCase(),
   );
-  const formatted = exactAmount(value, token?.decimals);
-  const raw = formatted.endsWith(" (raw)");
   const address = String(data.tokenAddress ?? "");
   const symbol =
     token?.symbol ??
     (address.toLowerCase() === "0x0000000000000000000000000000000000000000"
       ? t("fundingNative")
       : address ? address.slice(0, 6) + "…" + address.slice(-4) : "");
-  return (
-    <span className="amount">
-      <span className="amount-value">
-        {raw ? formatted.slice(0, -6) : formatted}
-      </span>{" "}
-      <span className="amount-token" title={address}>
-        {symbol}
-      </span>
-      {raw && <small className="raw-unit">{t("rawUnits")}</small>}
-    </span>
-  );
+  return <AmountDisplay value={value} decimals={token?.decimals} symbol={symbol} address={address} compact={compact} t={t}/>;
 }
 function principal(r: RecordData) {
   if (r.publicDepositAmount !== undefined) return String(r.publicDepositAmount);
@@ -318,25 +291,16 @@ function Listing({
 }) {
   const { t } = useContext(Context);
   const nav = useNavigate();
-  const [cursors, setCursors] = useState<string[]>([""]);
   const [full, setFull] = useState(false);
   const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    setCursors([""]);
-  }, [type]);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(id);
   }, []);
-  const result = useData<Page>(
-    "/" +
-      type +
-      "?limit=20" +
-      (cursors.at(-1) ? "&cursor=" + encodeURIComponent(cursors.at(-1)!) : ""),
-  );
+  const result = useCursorPagination<Page>("/" + type);
   const items = result.data?.items ?? [];
   return (
-    <section className="card">
+    <section className="card" aria-busy={result.loading}>
       <div className="section-head">
         <h2>{t(compact ? "recentActivity" : (type as Key))}</h2>
         <button
@@ -351,7 +315,12 @@ function Listing({
           </small>
         )}
       </div>
-      {result.loading || result.error ? (
+      {result.notice && <p className="pagination-message" role="status">{t(result.notice === "updated" ? "paginationUpdated" : "paginationRestarted")}</p>}
+      {result.error && result.data && <div className="pagination-message" role="alert">
+        <span>{t(result.error.code === "CONFLICT" ? "paginationChanging" : "unavailable")}</span>
+        <button className="plain" onClick={result.retry}>{t("retry")}</button>
+      </div>}
+      {!result.data && (result.loading || result.error) ? (
         <State {...result} />
       ) : !items.length ? (
         <State empty />
@@ -389,7 +358,7 @@ function Listing({
                     role={id ? "link" : undefined}
                     aria-label={id}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && id) nav(href);
+                      if (e.key === "Enter" && e.target === e.currentTarget && id) nav(href);
                     }}
                     onClick={() => {
                       if (id && !window.getSelection()?.toString()) nav(href);
@@ -419,7 +388,7 @@ function Listing({
                         </td>
                         <td className="amount-cell" data-label={t("amount")}>
                           {principal(r) !== undefined ? (
-                            <Amount value={principal(r)} data={r} />
+                            <Amount value={principal(r)} data={r} compact />
                           ) : (
                             "—"
                           )}
@@ -459,19 +428,21 @@ function Listing({
       )}
       <div className="pagination">
         <span>
-          {t("total")} {result.data?.total ?? "—"} · {t("page")}{" "}
-          {cursors.length}
+          {(result.data?.total == null
+            ? t("paginationPage")
+            : t("paginationSummary").replace("{total}", String(result.data.total))
+          ).replace("{page}", String(result.page))}
         </span>
         <div>
           <button
-            disabled={cursors.length === 1 || result.loading}
-            onClick={() => setCursors((c) => c.slice(0, -1))}
+            disabled={result.page === 1 || result.loading}
+            onClick={result.previous}
           >
             {t("previous")}
           </button>
           <button
-            disabled={!result.data?.nextCursor || result.loading}
-            onClick={() => setCursors((c) => [...c, result.data!.nextCursor!])}
+            disabled={!result.data?.nextCursor || result.loading || !!result.error}
+            onClick={result.next}
           >
             {t("next")}
           </button>
@@ -951,7 +922,7 @@ function LanguagePicker({ language, onChange, label }: {
 }
 function App() {
   const [language, setLanguage] = useState<Language>(initialLanguage);
-  const metadata = useData<RecordData>("/metadata");
+  const metadata = useData<RecordData>("/metadata", 30000);
   const location = useLocation();
   const [type, id] = location.pathname.split("/").filter(Boolean);
   const t = (key: Key) => dictionaries[language][key] ?? key;

@@ -64,7 +64,7 @@ func Run(ctx context.Context, c config.Config) error {
 	for _, v := range c.Chains {
 		scopes = append(scopes, upstream.Scope(v))
 	}
-	eview := explorer.New(store.DB, explorer.Options{Dialect: "sqlite", CursorKey: key, Scopes: scopes, Metadata: metadata(c), PublicState: &publicState{syncer: syncer, chains: c.Chains}, Recognition: func(ctx context.Context, op model.Operation) (any, error) {
+	eview := explorer.New(store.DB, explorer.Options{Dialect: "sqlite", CursorKey: key, Scopes: scopes, MetadataProvider: func(ctx context.Context) (any, error) { return cachedMetadata(ctx, store, c) }, PublicState: &publicState{syncer: syncer, chains: c.Chains}, Recognition: func(ctx context.Context, op model.Operation) (any, error) {
 		return syncer.Recognition(ctx, lookup(op.ChainID, op.ProtocolAddress), op)
 	}, NoteRecognition: func(ctx context.Context, chain, protocol string, commitment wire.Field) (any, error) {
 		return syncer.NoteRecognition(ctx, lookup(chain, protocol), commitment)
@@ -114,6 +114,28 @@ func Run(ctx context.Context, c config.Config) error {
 						delay = 10 * time.Millisecond
 					}
 					timer.Reset(delay)
+				}
+			}
+		}()
+	}
+	metadataChains := map[string]bool{}
+	for _, chain := range c.Chains {
+		if metadataChains[chain.ChainID] {
+			continue
+		}
+		metadataChains[chain.ChainID] = true
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			timer := time.NewTimer(0)
+			defer timer.Stop()
+			for {
+				select {
+				case <-workerCtx.Done():
+					return
+				case <-timer.C:
+					_ = syncer.RefreshTokens(workerCtx, chain, c.Tokens, time.Now())
+					timer.Reset(c.PollDuration())
 				}
 			}
 		}()

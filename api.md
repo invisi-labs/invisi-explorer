@@ -7,7 +7,7 @@ All responses are JSON. GET routes are read-only; search is POST-only with `Cont
 | Route | Result |
 | --- | --- |
 | `GET /healthz` | Process HTTP liveness, independent of upstream readiness |
-| `GET /api/v1/metadata` | Configured networks and tokens |
+| `GET /api/v1/metadata` | Configured networks and configured/cached token metadata |
 | `GET /api/v1/overview` | Counts in the indexed canonical prefix, snapshot and recognition count availability |
 | `GET /api/v1/transactions` | Settlement-operation rows, including unsupported or failed public operations |
 | `GET /api/v1/transactions/{txHash}` | Operations grouped for a transaction, remote recognition and snapshot |
@@ -25,7 +25,7 @@ All responses are JSON. GET routes are read-only; search is POST-only with `Cont
 
 List filters are `chainId`, `protocolAddress`, `tokenAddress`, `kind`, `namespace` (or `type`), `limit` (1–200; default 20), and opaque `cursor`. Unknown or repeated query fields fail. A page contains `items`, decimal-string `total`, `snapshot`, optional `unit` and `nextCursor`. Broadcaster directory uses `items`, `sources`, `status`, `totalBasis` and `directoryCompleteness` instead of a fabricated total.
 
-Snapshots bind configured deployments, indexed block anchors, canonical operation count, local chain generation and recognition/projection revision. Cursors are HMAC authenticated with a locally generated random key, bind route/filter/limit and snapshot, and contain no service signing authority. Append-only synchronization preserves a cursor's original prefix. Chain rollback invalidates it; changed recognition or enrichment returns `CONFLICT`. Restart keeps the cursor key. Deleting the key invalidates old cursors.
+Snapshots bind configured deployments, indexed block anchors, canonical operation count, local chain generation and recognition/projection revision. Cursors are HMAC authenticated with a locally generated random key, bind route/filter/limit and snapshot, and contain no service signing authority. Append-only synchronization preserves a cursor's original prefix. Chain rollback invalidates it; changed recognition or enrichment returns `CONFLICT`. Restart keeps the cursor key. Deleting the key invalidates old cursors. Browser pagination renews an expired snapshot and rebuilds cursors to the requested page, up to ten pages. Deeper sessions and chain reorganizations restart at page one with a notice. Recovery retries are bounded. Page numbers change only after successful responses; transport failures retain the last valid rows and total, and Retry obtains a fresh snapshot.
 
 Ingestion follows RPC continuation even across empty pages. It stages a bounded 128-block window durably and publishes operations/projections and its prefix marker atomically only after exhausting the cursor and rechecking the canonical header. It resumes persisted cursors after restart. Eight upstream pages are processed per turn; backlog drains continuously, then the configured polling interval applies. Reorg reconciliation retains orphan operations and walks saved range anchors back to a common prefix. A failed or incomplete upstream response never publishes an empty completed range.
 
@@ -40,3 +40,11 @@ Amounts appear only where public or publicly derivable from authenticated public
 SQLite supports one running Explorer per query database, enforced by a local file lock. Back up the database together with its `.cursor-key`; use a dedicated path, never a Provenance/RPC/Broadcaster database. HTTPS termination and authentication, if required for deployment, belong at the operator's reverse proxy.
 
 Protocol tree metadata is bounded by the selected RPC root index. Active tree ID, tree count and contract `rootHistory` membership are omitted when that API does not establish them; empty or false values are not fabricated. A snapshot older than the RPC's retained root history can report the tree unavailable.
+
+## Token metadata and amount display
+
+`GET /api/v1/metadata` returns configured tokens and automatically discovered ERC-20 metadata, keyed by chain ID and address. `symbol` and `decimals` can be independently absent for automatically resolved tokens. An absent `decimals` means unknown; zero is a valid known precision. Configured entries take priority. Metadata requests read the local cache and do not call upstream services.
+
+A background worker reads `symbol()` and `decimals()` through Protocol RPC at a finalized block. Successful entries refresh after 24 hours; incomplete or failed reads retry after five minutes and retain previous successful fields. The cache persists in the Explorer database. Discovery covers historical published operations and their funding transfers; native-asset addresses are not queried as ERC-20 contracts.
+
+Transaction lists display at most six fractional digits, mark rounded values with `≈`, and show nonzero values below `0.000001` as a bound. Detail views retain full precision. Hovering an amount reveals its exact value; the adjacent copy action copies the exact ungrouped decimal number. Unknown precision remains explicitly labeled in raw units. All API amounts remain unchanged integer strings.

@@ -24,15 +24,16 @@ import (
 )
 
 type Options struct {
-	PublicState     PublicState
-	Dialect         string
-	CursorKey       []byte
-	Metadata        any
-	Scopes          []p.Scope
-	Recognition     func(context.Context, model.Operation) (any, error)
-	NoteRecognition func(context.Context, string, string, p.Field) (any, error)
-	Roots           func(context.Context) (any, error)
-	Diagnostics     func(context.Context) (any, error)
+	PublicState      PublicState
+	Dialect          string
+	CursorKey        []byte
+	Metadata         any
+	MetadataProvider func(context.Context) (any, error)
+	Scopes           []p.Scope
+	Recognition      func(context.Context, model.Operation) (any, error)
+	NoteRecognition  func(context.Context, string, string, p.Field) (any, error)
+	Roots            func(context.Context) (any, error)
+	Diagnostics      func(context.Context) (any, error)
 }
 type Explorer struct {
 	db        *sql.DB
@@ -485,6 +486,9 @@ func (e *Explorer) Public(ctx context.Context, pathSuffix string, values url.Val
 	if pathSuffix == "/metadata" {
 		if len(values) != 0 || len(body) != 0 {
 			return nil, publicError("INVALID_PARAMS")
+		}
+		if e.options.MetadataProvider != nil {
+			return e.options.MetadataProvider(ctx)
 		}
 		return e.options.Metadata, nil
 	}

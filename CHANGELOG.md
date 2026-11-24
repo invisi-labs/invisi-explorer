@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3
+
+- Discover ERC-20 tokens in public history and funding transfers; read symbol and decimals through finalized Protocol RPC calls and persist an independent Explorer metadata cache. Preserve configured overrides, unknown precision and retry behavior without interrupting indexing.
+- Shorten list amounts with explicit rounding markers, retain exact detail values, and show full precision on hover or keyboard focus. Copy the exact ungrouped amount without floating point conversion.
+- Recover expired pagination snapshots with fresh authenticated cursors, commit page numbers only after successful loads, prevent duplicate navigation and retain valid rows and totals during errors. Preserve backend conflict and reorg validation.
+- Use complete localized pagination labels, including “共 52 条 · 第 3 页”, and omit unknown totals.
+
 ## 1.3.2
 
 - Prefetch up to four complete finalized history windows concurrently, then validate fresh boundaries and publish in order through one atomic SQLite transaction per window. Retain sequential near-head scanning, durable dense-page cursors and reorg recovery.
