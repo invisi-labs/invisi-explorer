@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { recognitionQueryStatus } from "./public";
 import type { Key } from "./i18n";
 
 const explanations: Record<string, Key> = {
@@ -36,7 +37,7 @@ export function RecognitionSummary({
 }) {
   return (
     <div className="recognition-summary">
-      {status(data.status ?? data.recognitionState ?? "unknown")}
+      {status(recognitionQueryStatus(data))}
       {recognitionReasons(data).map((reason) => (
         <p className="recognition-reason" key={reason}>
           {explanations[reason] && <span>{t(explanations[reason])}</span>}

@@ -12,3 +12,8 @@ export function TransactionAmounts({data,amount,fallback}:{data:RecordData;amoun
     ? <>{data.publicDepositAmounts.map((entry:RecordData,i:number)=><div key={entry.tokenAddress ?? i}>{amount(entry.amount,entry.tokenAddress)}</div>)}</>
     : <>—</>;
 }
+
+export function NoteGenerationLabel({data,t}:{data:RecordData;t:(key:Key)=>string}) {
+  if (data.kind === "creditDraw" || data.kind === "createCredit") return <>{t("noteCreditPayment")}</>;
+  return <>{data.kind in dictionaries.en ? t(data.kind as Key) : data.kind ?? "—"}</>;
+}

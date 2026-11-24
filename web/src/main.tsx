@@ -15,12 +15,14 @@ import {
   validateSearch,
   objectIdentity,
   statusKey,
+  recognitionQueryStatus,
   showsSourceRecognition,
   collectionFor,
   type ApiError,
 } from "./public";
 import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
+import { AdvancedTools } from "./AdvancedTools";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
 import { AddressReference } from "./AddressReference";
@@ -30,7 +32,7 @@ import { GrantHistory } from "./GrantHistory";
 import { grantStatusKey, compactIdentifier, isCreditOperation } from "./credit";
 import { FundingPanel } from "./FundingPanel";
 import { SourceRecognition } from "./SourceRecognition";
-import { TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
+import { NoteGenerationLabel, TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
 import { NetworkIcon } from "./NetworkIcon";
 import { DiagnosticsPanel, type DiagnosticsResponse } from "./DiagnosticsPanel";
 type RecordData = Record<string, any>;
@@ -243,7 +245,7 @@ function RecognitionBadges({ data }: { data: RecordData }) {
             key={i}
           >
             {Number(data.operationCount)>1 && row.operationIndex!==undefined && <small>{t("operationNumber").replace("{number}",String(BigInt(row.operationIndex)+1n))}</small>}
-            <Status value={row.status ?? row.recognitionState} />
+            <Status value={recognitionQueryStatus(row)} />
           </span>
         ))
       ) : (
@@ -334,21 +336,21 @@ function Listing({
         <State empty />
       ) : (
         <div className="table-wrap">
-          <table className={type === "grants" ? "grants-table" : undefined}>
+          <table className={type === "grants" ? "public-list grants-table" : "public-list"}>
             <thead>
               <tr>
                 <th>{identityLabel}</th>
                 <th>{t("network")}</th>
                 {type === "transactions" && (
                   <>
-                    <th>{t("operation")}</th>
+                    <th>{t("transactionTypeLabel")}</th>
                     <th>{t("execution")}</th>
                     <th>{t("amount")}</th>
                     <th>{t("recognition")}</th>
                   </>
                 )}
                 {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("grantHistoryCount")}</th></>}
-                {type === "notes" && <th>{t("recognition")}</th>}
+                {type === "notes" && <><th>{t("noteGenerationMethod")}</th><th title={t("notePublicAmountHint")}>{t("notePublicAmount")}</th><th>{t("recognition")}</th></>}
                 <th>
                   <button className="plain" onClick={() => setFull((x) => !x)}>
                     {t(full ? "time" : "age")} ⇄
@@ -393,7 +395,7 @@ function Listing({
                     </td>
                     {type === "transactions" && (
                       <>
-                        <td data-label={t("operation")}>
+                        <td data-label={t("transactionTypeLabel")}>
                           <TransactionOperationLabel data={r} t={t}/>
                         </td>
                         <td data-label={t("execution")}>
@@ -419,12 +421,16 @@ function Listing({
                       <td data-label={t("grantHistoryCount")}><Link to={href} onClick={e=>e.stopPropagation()}>{r.historyCount === undefined ? "—" : t("grantActionCount").replace("{count}", String(r.historyCount))}</Link></td>
                     </>}
                     {type === "notes" && (
+                      <>
+                      <td data-label={t("noteGenerationMethod")}><NoteGenerationLabel data={r} t={t}/></td>
+                      <td className="amount-cell" data-label={t("notePublicAmount")}>{r.amount !== undefined && r.amount !== null ? <Amount value={r.amount} data={r} compact/> : <span className="muted">{t("noteAmountPrivate")}</span>}</td>
                       <td
                         className="recognition-cell"
                         data-label={t("recognition")}
                       >
                         <RecognitionBadges data={r} />
                       </td>
+                      </>
                     )}
                     <td
                       data-label={t(full ? "time" : "age")}
@@ -583,12 +589,13 @@ function PublicFields({ data, showSourceTransaction = true, showNoteAmount = fal
                 ) : ["amount", "withdrawalAmount", "feeAmount"].includes(
                     key,
                   ) ? (
-                  data[key] === undefined ? <span className="muted">{t("notPublic")}</span> : <Amount value={data[key]} data={data} />
+                  data[key] === undefined || data[key] === null ? <span className="muted">{t("notPublic")}</span> : <Amount value={data[key]} data={data} />
                 ) : key === "kind" && data[key] in dictionaries.en ? (
                   t(data[key] as Key)
                 ) : (
                   String(data[key])
                 )}
+                {key === "amount" && <p className="muted note-amount-hint">{t("notePublicAmountHint")}</p>}
               </dd>
             </React.Fragment>
           ),
@@ -633,6 +640,10 @@ function PublicFields({ data, showSourceTransaction = true, showNoteAmount = fal
     </dl>
   );
 }
+function ObjectDescription({type}: {type: string}) {
+  const {t} = useContext(Context);
+  return type === "trees" || type === "roots" ? <p className="muted">{t(type === "trees" ? "treesDescription" : "rootsDescription")}</p> : null;
+}
 function GrantDetail({id}: {id: string}) {
   const {t} = useContext(Context);
   const result = useCursorPagination<RecordData>("/grants/" + encodeURIComponent(id));
@@ -674,6 +685,7 @@ function Detail({ type, id }: { type: string; id: string }) {
         <Link to={type === "credit-states" ? "/grants" : "/" + type}>{t(type === "credit-states" ? "grants" : type as Key)}</Link> /
       </p>
       <h1>{t(type as Key)}</h1>
+              <ObjectDescription type={type}/>
       {aggregate && <p className="muted">{t("aggregate")} · {t("operationCount").replace("{count}",String(operations.length))}</p>}
       <div className="detail-hash">
         <Address
@@ -945,15 +957,16 @@ function App() {
           <LanguagePicker language={language} onChange={setLanguage} label={t("language")} />
         </div>
         <nav aria-label={t("all")}>
-          {routes.filter(r=>r!=="credit-states").map((r) => (
+          {routes.filter(r=>!["credit-states","nullifiers","trees","roots"].includes(r)).map((r) => (
             <Link
               key={r}
               to={r === "transactions" ? "/" : "/" + r}
               aria-current={type === r || (type === "credit-states" && r === "grants") || (!type && r === "transactions") ? "page" : undefined}
             >
-              {t(r)}
+              {t(r === "broadcasters" ? "broadcastersNav" : r)}
             </Link>
           ))}
+          <AdvancedTools t={t}/>
         </nav>
       </header>
       <main>
@@ -980,6 +993,7 @@ function App() {
           ) : (
             <>
               <h1>{t(type as Key)}</h1>
+              <ObjectDescription type={type}/>
               <Search />
               <Listing key={type} type={type} />
             </>

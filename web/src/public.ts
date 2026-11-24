@@ -110,6 +110,13 @@ export function objectIdentity(
   }
   return "";
 }
+// Query availability is distinct from the operation's recognition decision.
+export function recognitionQueryStatus(data: Record<string, unknown>): unknown {
+  const status = data.status ?? data.recognitionState ?? "unknown";
+  if (status !== "provider_unavailable") return status;
+  const reason = data.reason ?? data.reasonCode;
+  return reason === "INDEX_PENDING" ? "recognition_index_pending" : reason === "NOT_FOUND" ? "recognition_not_found" : status;
+}
 export function statusKey(value: unknown): import("./i18n").Key {
   const labels: Record<string, import("./i18n").Key> = {
     pending_source: "pending",
@@ -120,6 +127,8 @@ export function statusKey(value: unknown): import("./i18n").Key {
     recognized: "recognized",
     source_rejected: "rejected",
     provider_unavailable: "providerUnavailable",
+    recognition_index_pending: "recognitionSyncing",
+    recognition_not_found: "recognitionMissing",
     chain_reorged: "reorg",
     not_applicable: "notApplicable",
     verifying: "verifying",

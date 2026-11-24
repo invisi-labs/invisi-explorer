@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
+import { NoteGenerationLabel, TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
 import { dictionaries } from "./i18n";
 it("labels aggregate operation count and keeps single transaction labels",()=>{
  const t=(k:keyof typeof dictionaries.en)=>dictionaries.en[k];
@@ -11,4 +11,10 @@ it("shows distinct assets separately and never adds their base units",()=>{
  const html=renderToStaticMarkup(<TransactionAmounts data={{publicDepositAmounts:[{amount:"7",tokenAddress:"a"},{amount:"11",tokenAddress:"b"}]}} amount={(value,token)=><span>{value} {token}</span>}/>);
  expect(html).toContain("7 a");expect(html).toContain("11 b");expect(html).not.toContain("18");
  expect(renderToStaticMarkup(<TransactionAmounts data={{publicDepositAmounts:[]}} amount={()=>null}/>)).toContain("—");
+});
+
+it.each(["createCredit","creditDraw"])("labels Note generation as credit payment for %s without renaming the transaction action",kind=>{
+ const t=(k:keyof typeof dictionaries.en)=>dictionaries["zh-Hans"][k];
+ expect(renderToStaticMarkup(<NoteGenerationLabel data={{kind}} t={t}/>)).toBe("授信支付");
+ expect(renderToStaticMarkup(<TransactionOperationLabel data={{kind}} t={t}/>)).toBe(kind === "createCredit" ? "创建授信" : "授信扣款");
 });

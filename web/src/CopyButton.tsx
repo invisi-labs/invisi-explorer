@@ -10,7 +10,7 @@ export function CopyButton({ value, t, className = "icon" }: {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   return <>
-    <button type="button" className={className} aria-label={t("copy")} title={t("copy")}
+    <button type="button" className={`${className} copy-button`} aria-label={t("copy")} title={t("copy")}
       onClick={async (event) => {
         event.stopPropagation();
         try {

@@ -6,6 +6,7 @@ import {
   request,
   objectIdentity,
   statusKey,
+  recognitionQueryStatus,
   showsSourceRecognition,
   collectionFor,
   finalityKey,
@@ -128,4 +129,12 @@ it("hides inapplicable source recognition without hiding pending or mixed transa
   expect(showsSourceRecognition("transactions", {recognition: [{status: "not_applicable"}, {status: "pending_source"}]})).toBe(true);
   expect(showsSourceRecognition("transactions", {})).toBe(true);
   expect(showsSourceRecognition("notes", {recognition: [{status: "recognized"}]})).toBe(true);
+});
+
+it("distinguishes synchronization, absent records and lookup outages without changing real recognition states",()=>{
+ expect(statusKey(recognitionQueryStatus({status:"provider_unavailable",reason:"INDEX_PENDING"}))).toBe("recognitionSyncing");
+ expect(statusKey(recognitionQueryStatus({status:"provider_unavailable",reason:"NOT_FOUND"}))).toBe("recognitionMissing");
+ expect(statusKey(recognitionQueryStatus({status:"provider_unavailable",reason:"PROVENANCE_UNAVAILABLE"}))).toBe("providerUnavailable");
+ expect(recognitionQueryStatus({status:"recognized",reason:"NOT_FOUND"})).toBe("recognized");
+ expect(recognitionQueryStatus({recognitionState:"pending_proof"})).toBe("pending_proof");
 });
