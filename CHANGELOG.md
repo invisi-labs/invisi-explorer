@@ -1,7 +1,8 @@
 # Changelog
 
-## 1.3.4
+## 1.3.5
 
+- Package current root documentation and built frontend from a clean source export without requiring removed migration documents. Keep archive smoke checks aligned with the maintained release contents.
 - Present credit creation, updates, draws and revocations with operation-specific public fields. Automatically backfill canonical grant identity and group fixed grant slots into one entity with paginated action/state history. Keep private policy and balances undisclosed and distinguish shared payer amounts.
 - Paginate transaction instances rather than operation rows, with aggregate operation counts, per-operation detail recognition, mixed execution outcomes and separate per-token public funding totals. Preserve scoped snapshots and restart legacy cursors.
 - Bind optional transaction sender/type/recipient observations to indexed receipts and fresh canonical headers. Derive public withdrawal recipients only from authenticated statements, retain evidence uncertainty, and expose public transfer execution data across transaction kinds.

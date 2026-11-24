@@ -31,7 +31,6 @@ for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
   GOWORK=off CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" \
     go build -trimpath -o "$package/$binary" ./cmd/invisi-explorer
   cp LICENSE README.md api.md cammand.md CHANGELOG.md "$package/"
-  cp -R docs "$package/"
   mkdir -p "$package/web"
   cp web/README.md "$package/web/"
   cp -R web/dist "$package/web/"

@@ -43,7 +43,7 @@ npm run build
 
 The browser sources were moved from `invisi-provenance/web`. Explorer now owns `/api/v1/*` and static hosting. Provenance continues to serve `/v1` discovery and `/v1/chains/{chainId}` JSON-RPC; its old browser routes are removed.
 
-Deploy Explorer and point the explorer hostname/reverse proxy to its listener. Configure its upstream scopes against the existing RPC and Provenance services. See the [migration guide](docs/migration.md) for the cutover sequence and optional live checks. Retain Provenance's database, issuer identity, cursor/signing keys and published history in their existing service directory. Do not copy them into Explorer or reinitialize the issuer during migration. Explorer uses its own database and can rebuild public query data from its upstreams.
+Deploy Explorer and point the explorer hostname/reverse proxy to its listener. Configure its upstream scopes against the existing RPC and Provenance services. Retain Provenance's database, issuer identity, cursor/signing keys and published history in their existing service directory. Do not copy them into Explorer or reinitialize the issuer during migration. Explorer uses its own database and can rebuild public query data from its upstreams.
 
 Chain execution, provenance recognition and broadcast acceptance remain independent. A Provenance outage must not turn an available transaction into a failed execution or an unrecognized verdict. Broadcaster availability is optional. Public Note/Credit state and amounts retain their separate domains, and Explorer does not infer decrypted owners, private balances or commitment-to-nullifier associations.
 
@@ -64,13 +64,13 @@ docker run --rm -p 18670:18670 -v invisi-explorer-data:/var/lib/invisi-explorer 
 
 ## Releases
 
-The [v1.3.4 GitHub Release](https://github.com/invisi-labs/invisi-explorer/releases/tag/v1.3.4) contains `invisi-explorer_v1.3.4_{linux,darwin}_{amd64,arm64}.tar.gz` and `SHA256SUMS-v1.3.4.txt`. Each archive includes the executable, built frontend under `web/dist`, license and documentation. Verify the downloaded archives with `sha256sum -c SHA256SUMS-v1.3.4.txt` (macOS: `shasum -a 256 -c SHA256SUMS-v1.3.4.txt`).
+The [v1.3.5 GitHub Release](https://github.com/invisi-labs/invisi-explorer/releases/tag/v1.3.5) contains `invisi-explorer_v1.3.5_{linux,darwin}_{amd64,arm64}.tar.gz` and `SHA256SUMS-v1.3.5.txt`. Each archive includes the executable, built frontend under `web/dist`, license and documentation. Verify the downloaded archives with `sha256sum -c SHA256SUMS-v1.3.5.txt` (macOS: `shasum -a 256 -c SHA256SUMS-v1.3.5.txt`).
 
 Run from the extracted archive directory so the default `web/dist` resolves correctly:
 
 ```sh
-tar -xzf invisi-explorer_v1.3.4_linux_amd64.tar.gz
-cd invisi-explorer_v1.3.4_linux_amd64
+tar -xzf invisi-explorer_v1.3.5_linux_amd64.tar.gz
+cd invisi-explorer_v1.3.5_linux_amd64
 ./invisi-explorer --version
 ./invisi-explorer --dir ./data init
 # Configure explicit chain/token scopes as described in cammand.md.
@@ -79,6 +79,6 @@ cd invisi-explorer_v1.3.4_linux_amd64
 
 When running from another directory, persist an absolute frontend path with `./invisi-explorer --dir /path/to/data settings set --web-dir /path/to/extracted/web/dist`.
 
-The release image is `ghcr.io/invisi-labs/invisi-explorer:1.3.4` for Linux amd64 and arm64. Use it in the container examples above in place of `invisi-explorer:local`; keep the explicit static directory setting `/opt/invisi/explorer`. Image digests and source revisions are recorded in the release notes.
+The release image is `ghcr.io/invisi-labs/invisi-explorer:1.3.5` for Linux amd64 and arm64. Use it in the container examples above in place of `invisi-explorer:local`; keep the explicit static directory setting `/opt/invisi/explorer`. Image digests and source revisions are recorded in the release notes.
 
-Maintainers can reproduce the four archives with `./scripts/build-release.sh v1.3.4 dist` (Go, Node 24 and Python 3.12+), then run `python3 scripts/smoke-archives.py v1.3.4 dist`. The build installs frontend dependencies and rebuilds assets rather than consuming existing `web/dist`. Stable `vX.Y.Z` tags trigger the publish workflow: test the tagged Go/frontend source, build and smoke-test archives, publish the multiarchitecture GHCR image, smoke-test its HTTP assets and license, and attach archives/checksums plus the exact changelog section to GitHub Releases. Manual dispatch accepts an existing stable tag; an optional full revision publishes only a separately named deployment image. Clean-source CI builds both image architectures and archives without sibling checkouts or ignored host assets.
+Maintainers can reproduce the four archives with `./scripts/build-release.sh v1.3.5 dist` (Go, Node 24 and Python 3.12+), then run `python3 scripts/smoke-archives.py v1.3.5 dist`. The build installs frontend dependencies and rebuilds assets rather than consuming existing `web/dist`. Stable `vX.Y.Z` tags trigger the publish workflow: test the tagged Go/frontend source, build and smoke-test archives, publish the multiarchitecture GHCR image, smoke-test its HTTP assets and license, and attach archives/checksums plus the exact changelog section to GitHub Releases. Manual dispatch accepts an existing stable tag; an optional full revision publishes only a separately named deployment image. Clean-source CI builds both image architectures and archives without sibling checkouts or ignored host assets.

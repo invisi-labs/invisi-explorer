@@ -29,7 +29,8 @@ for name in sorted(expected):
         assert (root / 'LICENSE').read_bytes() == Path('LICENSE').read_bytes()
         for asset in ('index.html', 'assets/invisipay-mark.svg', 'fonts/jetbrains-mono-latin.woff2', 'assets/networks/LICENSE'):
             assert (root / 'web/dist' / asset).stat().st_size, asset
-        assert (root / 'docs/migration.md').is_file()
+        for document in ('README.md', 'api.md', 'cammand.md', 'CHANGELOG.md'):
+            assert (root / document).is_file(), document
         if not name.endswith(host + '.tar.gz'):
             continue
         binary = str(root / 'invisi-explorer')
