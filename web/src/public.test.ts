@@ -118,6 +118,10 @@ it("keeps finality availability separate from execution and recognition", () => 
 
 it("hides inapplicable source recognition without hiding pending or mixed transactions", () => {
   expect(showsSourceRecognition("credit-states", {})).toBe(false);
+  for (const type of ["nullifiers", "trees", "roots", "grants", "broadcasters", "diagnostics"]) {
+    expect(showsSourceRecognition(type, {})).toBe(false);
+  }
+  expect(showsSourceRecognition("nullifiers", {kind:"transfer",recognitionStatus:"recognized"})).toBe(false);
   expect(showsSourceRecognition("transactions", {recognition: [{status: "not_applicable"}]})).toBe(false);
   expect(showsSourceRecognition("transactions", {recognition: {recognitionState: "not_applicable"}})).toBe(false);
   expect(showsSourceRecognition("transactions", {recognitionStatus: "not_applicable"})).toBe(false);

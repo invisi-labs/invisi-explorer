@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 import { CopyButton } from "./CopyButton";
 import type { Key } from "./i18n";
 
-export function AddressReference({ value, kind, explorerUrl, internalHref, t }: {
+export function AddressReference({ value, kind, explorerUrl, internalHref, compact = false, displayLabel, t }: {
   value: string;
+  compact?: boolean;
+  displayLabel?: string;
   kind?: "tx" | "address" | "token";
   explorerUrl?: string;
   internalHref?: string;
@@ -19,10 +21,11 @@ export function AddressReference({ value, kind, explorerUrl, internalHref, t }: 
       }
     }
   } catch { /* Keep identifiers copyable when network metadata is unavailable. */ }
+  const label = displayLabel ?? (compact && value.length > 18 ? value.slice(0, 8) + "…" + value.slice(-6) : value);
   return <span className="address">
     {internalHref
-      ? <Link className="address-value" to={internalHref}><code title={value}>{value}</code></Link>
-      : <code className="address-value" title={value}>{value}</code>}
+      ? <Link className="address-value" to={internalHref}><code title={value}>{label}</code></Link>
+      : <code className="address-value" title={value}>{label}</code>}
     <span className="address-actions">
       <CopyButton value={value} t={t}/>
       {externalHref && <a className="icon" href={externalHref} target="_blank" rel="noopener noreferrer" aria-label={t("external")} title={t("external")}>

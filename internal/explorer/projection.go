@@ -171,6 +171,11 @@ func (e *Explorer) list(ctx context.Context, route string, q query) (Page, error
 		if err != nil {
 			return Page{}, err
 		}
+		if route == "grants" && q.hash == "" {
+			if err = e.enrichGrantLifecycle(ctx, item, snapshot); err != nil {
+				return Page{}, err
+			}
+		}
 		page.Items = append(page.Items, item)
 	}
 	if more {
@@ -428,7 +433,7 @@ func (e *Explorer) project(ctx context.Context, route string, r publicRow) (map[
 		base["nullifier"] = list[r.index]
 	case "grants":
 		base["authorizationStatus"] = grantAuthorizationStatus(op.Kind)
-		for k, v := range creditActivity(op, stringValue(payload["payer"])) {
+		for k, v := range creditActivity(op, stringValue(payload["payer"]), stringValue(payload["grantId"])) {
 			base[k] = v
 		}
 		for k, v := range onlyPublic(payload, "payer", "owner", "payerIndex", "grantId", "tokenAddress", "revoked") {

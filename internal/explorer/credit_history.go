@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func creditActivity(op model.Operation, owner string) map[string]any {
+func creditActivity(op model.Operation, owner, grantID string) map[string]any {
 	out := map[string]any{"actions": []string{op.Kind}, "grantRefs": grantRefs(op), "feeAmount": op.FeeAmount, "feeRecipient": op.FeeRecipient, "amountScope": "operation"}
 	if effect, ok := map[string]string{"createCredit": "created", "updateCredit": "updated", "creditDraw": "advanced", "revokeCredit": "revoked"}[op.Kind]; ok {
 		out["stateEffect"] = effect
@@ -15,13 +15,30 @@ func creditActivity(op model.Operation, owner string) map[string]any {
 	if op.Kind == "createCredit" && len(op.NoteOutputs) > 0 {
 		out["actions"] = []string{"createCredit", "creditDraw"}
 	}
-	// Public state outputs belong to the operation. Their order is not used to
-	// guess which of multiple grant refs owns a particular commitment.
+	// Core binds grantRefs[i] to creditCommitments[i] in the proof inputs.
+	// RPC settlement projection preserves that order. Only attribute complete,
+	// matching arrays; never identify a slot by owner alone.
+	refs := grantRefs(op)
 	credits := []map[string]any{}
-	for _, c := range op.CreditOutputs {
-		credits = append(credits, onlyPublic(copyMap(c), "creditCommitment", "treeId", "leafIndex"))
+	scopedNullifiers := []p.Field{}
+	matched := false
+	if len(refs) == len(op.CreditOutputs) {
+		for i, ref := range refs {
+			if strings.EqualFold(stringValue(ref["payer"]), owner) && stringValue(ref["grantId"]) == grantID {
+				credits = append(credits, onlyPublic(copyMap(op.CreditOutputs[i]), "creditCommitment", "treeId", "leafIndex"))
+				if len(op.CreditNullifiers) == len(refs) {
+					scopedNullifiers = append(scopedNullifiers, op.CreditNullifiers[i])
+				}
+				matched = true
+			}
+		}
 	}
 	out["creditOutputs"] = credits
+	out["creditOutputScope"] = "grant"
+	out["creditOutputMappingConfirmed"] = matched
+	out["noteOutputScope"] = "operation"
+	out["creditNullifiers"] = scopedNullifiers
+
 	notes := []map[string]any{}
 	for i, n := range op.NoteOutputs {
 		m := onlyPublic(copyMap(n), "noteCommitment", "treeId", "leafIndex")
@@ -31,11 +48,9 @@ func creditActivity(op model.Operation, owner string) map[string]any {
 		notes = append(notes, m)
 	}
 	out["noteOutputs"] = notes
-	out["creditNullifiers"] = op.CreditNullifiers
 	if total, ok := publicMoney(op); ok {
 		out["operationFundingAmount"] = total.String()
 	}
-	refs := grantRefs(op)
 	count := 0
 	for _, ref := range refs {
 		if strings.EqualFold(stringValue(ref["payer"]), owner) {

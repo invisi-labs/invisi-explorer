@@ -107,16 +107,17 @@ func (e *Explorer) grant(ctx context.Context, q query, id string) (any, error) {
 	result := map[string]any{"id": q.hash, "chainId": q.chain, "protocolAddress": q.protocol, "tokenAddress": q.token, "payer": parts[3], "grantId": parts[4], "activities": page, "drawRecords": draws, "snapshot": page.Snapshot}
 	result["nextCursor"] = page.NextCursor
 	result["owner"] = parts[3]
-	result["historyStatus"] = "complete_at_indexed_head"
-	where, args := snapshotWhere(page.Snapshot)
-	args = append(args, q.chain, q.protocol, q.token)
-	var pending int64
-	pendingSQL := "SELECT COUNT(*) FROM operations o WHERE o.canonical=1 AND " + where + " AND o.chain_id=? AND o.protocol_address=? AND LOWER(" + e.extract("o.payload", "tokenAddress") + ")=? AND " + e.successSQL() + " AND " + e.extract("o.payload", "kind") + " IN ('createCredit','updateCredit','revokeCredit') AND COALESCE(" + e.extract("o.payload", "unsupportedReason") + ", '')='' AND COALESCE(CAST(" + e.extract("o.payload", "creditSlotIndexed") + " AS TEXT), 'false') NOT IN ('true','1')"
-	if err = e.db.QueryRowContext(ctx, e.sql(pendingSQL), args...).Scan(&pending); err != nil {
-		return nil, publicError("UNAVAILABLE")
+	if err = e.enrichGrantLifecycle(ctx, result, page.Snapshot); err != nil {
+		return nil, err
 	}
-	if pending > 0 {
-		result["historyStatus"] = "backfilling"
+	for _, item := range page.Items {
+		row := item.(map[string]any)
+		if row["kind"] == "revokeCredit" {
+			switch result["lifecycleStatus"] {
+			case "pre_revoked", "revoked_after_creation":
+				row["stateEffect"] = result["lifecycleStatus"]
+			}
+		}
 	}
 	if e.options.PublicState != nil {
 		anchor, err := chainAnchor(page.Snapshot, q.chain, q.protocol)

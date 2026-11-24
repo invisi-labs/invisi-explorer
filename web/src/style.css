@@ -390,3 +390,48 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
 .grant-list-reference { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; margin-top: 6px; }
 .grant-list-reference small { color: var(--secondary); font-size: 11px; }
 .grant-list-reference .address-value { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.grant-list-reference .address-value { max-width: none; }
+
+/* Grant history outputs use a compact disclosure, separate from action dividers. */
+.grant-outputs { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.grant-outputs > summary { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; list-style: none; background: var(--surface); color: var(--ink); }
+.grant-outputs > summary::-webkit-details-marker { display: none; }
+.grant-outputs > summary::marker { content: ""; }
+.grant-outputs > summary:hover { color: var(--purple-ink); }
+.grant-outputs > summary:focus-visible { outline: 2px solid var(--purple-ink); outline-offset: -3px; border-radius: 9px; }
+.grant-outputs-title { font-weight: 500; }
+.grant-outputs-count { color: var(--secondary); font-size: 12px; margin-left: auto; }
+.grant-outputs-chevron { flex-shrink: 0; color: var(--secondary); }
+.grant-outputs[open] > summary { border-bottom: 1px solid var(--line); }
+.grant-outputs[open] .grant-outputs-chevron { transform: rotate(90deg); }
+.grant-outputs > .muted { padding: 12px 14px 0; margin: 0; font-size: 12px; }
+.grant-outputs > .table-wrap { padding: 8px; }
+@media (max-width: 480px) {
+ .grant-outputs > summary { flex-wrap: wrap; gap: 4px 8px; }
+ .grant-outputs-count { order: 3; flex-basis: 100%; margin-left: 0; }
+ .grant-outputs-chevron { margin-left: auto; }
+}
+
+.grant-outputs .funding-table th:nth-child(1) { width: 17%; }
+.grant-outputs .funding-table th:nth-child(2) { width: 28%; }
+.grant-outputs .funding-table th:nth-child(3) { width: 27%; }
+.grant-outputs .funding-table th:nth-child(4), .grant-outputs .funding-table th:nth-child(5) { width: 14%; }
+.grant-outputs .amount-line { flex-wrap: wrap; }
+.grant-outputs .amount-number, .grant-outputs .amount-token { white-space: nowrap; }
+.grant-outputs .amount-value { overflow-wrap: normal; word-break: normal; }
+
+/* Keep entity identity prominent and supporting references quiet. */
+.grant-list-identifier { display: flex; align-items: center; gap: 6px; }
+.grant-list-identifier > span { display: inline-flex; }
+.grant-list-identifier .icon { width: 28px; height: 28px; min-height: 28px; border-radius: 6px; }
+.grants-table .grant-list-reference { margin-top: 2px; color: var(--secondary); font-size: 12px; }
+.grants-table .grant-list-token .address-value { font-family: inherit; }
+.grants-table .grant-list-token > div { display: flex; align-items: center; min-height: 28px; }
+@media (hover: hover) and (pointer: fine) {
+ .grants-table .icon { opacity: 0; pointer-events: none; }
+ .grants-table tr:hover .icon, .grants-table tr:focus-within .icon { opacity: 1; pointer-events: auto; }
+}
+@media (pointer: coarse) {
+ .grant-list-identifier .icon { width: 44px; height: 44px; min-height: 44px; }
+}

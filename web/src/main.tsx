@@ -20,13 +20,14 @@ import {
   type ApiError,
 } from "./public";
 import "./style.css";
+import { readMetadataCache, writeMetadataCache } from "./metadataCache";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
 import { AddressReference } from "./AddressReference";
 import { useCursorPagination } from "./useCursorPagination";
 import { CreditOperationPanel } from "./CreditOperationPanel";
 import { GrantHistory } from "./GrantHistory";
-import { isCreditOperation } from "./credit";
+import { grantStatusKey, compactIdentifier, isCreditOperation } from "./credit";
 import { FundingPanel } from "./FundingPanel";
 import { SourceRecognition } from "./SourceRecognition";
 import { TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
@@ -42,6 +43,7 @@ type Page = {
 const Context = createContext({
   t: (key: Key): string => key,
   metadata: {} as RecordData,
+  metadataPending: true,
 });
 const routes: Key[] = [
   "transactions",
@@ -60,13 +62,21 @@ function useData<T>(path: string, refreshMs = 0) {
     error?: ApiError;
     loading: boolean;
     fetchedAt?: number;
-  }>({ loading: true });
+  }>(()=>{
+    if (path === "/metadata") {
+      try { const data=readMetadataCache(sessionStorage) as T | undefined; if(data) return {data,loading:true}; } catch {}
+    }
+    return {loading:true};
+  });
   const [retry, bump] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     set(previous => refreshMs && previous.data ? { ...previous, error: undefined } : { loading: true });
     request<T>(path, controller.signal)
-      .then((data) => set({ data, loading: false, fetchedAt: Date.now() }))
+      .then((data) => {
+        if (path === "/metadata") { try { writeMetadataCache(sessionStorage,data as RecordData); } catch {} }
+        set({ data, loading: false, fetchedAt: Date.now() });
+      })
       .catch((error) => {
         if (!controller.signal.aborted) set(previous => refreshMs && previous.data ? { ...previous, error, loading: false } : { error, loading: false });
       });
@@ -77,6 +87,11 @@ function useData<T>(path: string, refreshMs = 0) {
     const timer = setInterval(() => bump(x => x + 1), refreshMs);
     return () => clearInterval(timer);
   }, [refreshMs]);
+  useEffect(()=>{
+    if(path !== "/metadata" || !state.error) return;
+    const timer=setTimeout(()=>bump(x=>x+1),3000);
+    return ()=>clearTimeout(timer);
+  },[path,state.error]);
   return { ...state, retry: () => bump((x) => x + 1) };
 }
 function State({
@@ -137,11 +152,15 @@ function Address({
   kind,
   data,
   internalHref,
+  compact = false,
+  displayLabel,
 }: {
   value: string;
   kind?: "tx" | "address" | "token";
   data?: RecordData;
   internalHref?: string;
+  compact?: boolean;
+  displayLabel?: string;
 }) {
   const { metadata, t } = useContext(Context);
   const n = metadata.networks?.find(
@@ -151,7 +170,14 @@ function Address({
     n?.explorerBaseUrl ??
     n?.explorerUrl ??
     n?.explorerTxUrl?.replace(/\/tx\/?$/, "");
-  return <AddressReference value={value} kind={kind} explorerUrl={base} internalHref={internalHref} t={t}/>;
+  return <AddressReference value={value} kind={kind} explorerUrl={base} internalHref={internalHref} compact={compact} displayLabel={displayLabel} t={t}/>;
+}
+
+function GrantToken({data}: {data: RecordData}) {
+ const {metadata,t} = useContext(Context);
+ const token = metadata.tokens?.find((r: RecordData)=>String(r.chainId)===String(data.chainId) && r.address?.toLowerCase()===data.tokenAddress?.toLowerCase());
+ if (data.tokenAddress?.toLowerCase() === "0x0000000000000000000000000000000000000000") return <span className="muted" title={data.tokenAddress}>-</span>;
+ return <Address value={data.tokenAddress} kind="token" data={data} compact displayLabel={token?.symbol}/>;
 }
 
 function Status({ value }: { value: unknown }) {
@@ -228,7 +254,8 @@ function RecognitionBadges({ data }: { data: RecordData }) {
 }
 
 function Amount({ value, data, compact = false }: { value: unknown; data: RecordData; compact?: boolean }) {
-  const { metadata, t } = useContext(Context);
+  const { metadata, metadataPending, t } = useContext(Context);
+  if (metadataPending) return <span className="muted" role="status">{t("loading")}</span>;
   const token = metadata.tokens?.find(
     (r: RecordData) =>
       String(r.chainId) === String(data.chainId) &&
@@ -307,7 +334,7 @@ function Listing({
         <State empty />
       ) : (
         <div className="table-wrap">
-          <table>
+          <table className={type === "grants" ? "grants-table" : undefined}>
             <thead>
               <tr>
                 <th>{identityLabel}</th>
@@ -320,7 +347,7 @@ function Listing({
                     <th>{t("recognition")}</th>
                   </>
                 )}
-                {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("creditLatestAction")}</th></>}
+                {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("grantHistoryCount")}</th></>}
                 {type === "notes" && <th>{t("recognition")}</th>}
                 <th>
                   <button className="plain" onClick={() => setFull((x) => !x)}>
@@ -347,15 +374,18 @@ function Listing({
                     }}
                   >
                     <td data-label={identityLabel}>
+                      <div className={type === "grants" ? "grant-list-identifier" : undefined}>
                       <Link to={href} onClick={(e) => e.stopPropagation()}>
-                        <code>
-                          {type === "grants" ? r.grantId : id.length > 22
+                        <code title={type === "grants" ? r.grantId : id}>
+                          {type === "grants" ? compactIdentifier(String(r.grantId)) : id.length > 22
                             ? id.slice(0, 12) + "…" + id.slice(-8)
                             : id || "—"}
                         </code>
                       </Link>
+                      {type === "grants" && <span onClick={event=>event.stopPropagation()}><CopyButton value={String(r.grantId)} t={t}/></span>}
+                      </div>
                       {type === "grants" && <div className="grant-list-reference" onClick={event=>event.stopPropagation()}>
-                        <small>{t("grantOwner")}</small><Address value={r.payer} kind="address" data={r}/>
+                        <Address value={r.payer} kind="address" data={r} compact/>
                       </div>}
                     </td>
                     <td data-label={t("network")}>
@@ -383,9 +413,10 @@ function Listing({
                       </>
                     )}
                     {type === "grants" && <>
-                      <td data-label={t("token")}><div className="grant-list-reference" onClick={event=>event.stopPropagation()}><Address value={r.tokenAddress} kind="token" data={r}/></div></td>
-                      <td data-label={t("creditGrantStatus")}><span className={"badge " + (r.authorizationStatus === "active" ? "good" : "")}>{t(r.authorizationStatus === "active" ? "creditGrantActive" : r.authorizationStatus === "revoked" ? "creditGrantRevoked" : "fundingUnknown")}</span></td>
-                      <td data-label={t("creditLatestAction")}>{r.kind in dictionaries.en ? t(r.kind as Key) : r.kind}</td>
+                      <td data-label={t("token")} className="grant-list-token"><div onClick={event=>event.stopPropagation()}><GrantToken data={r}/></div></td>
+                      <td data-label={t("creditGrantStatus")}><span className={"badge " + (r.authorizationStatus === "active" ? "good" : "")}>{t(grantStatusKey(r))}</span></td>
+
+                      <td data-label={t("grantHistoryCount")}><Link to={href} onClick={e=>e.stopPropagation()}>{r.historyCount === undefined ? "—" : t("grantActionCount").replace("{count}", String(r.historyCount))}</Link></td>
                     </>}
                     {type === "notes" && (
                       <td
@@ -615,7 +646,7 @@ function GrantDetail({id}: {id: string}) {
       <GrantHistory data={data} network={<Network data={data}/>} t={t}
         address={(value,kind)=><Address value={value} kind={kind ?? "address"} data={data}/>}
         transaction={row=><Address value={row.txHash} kind="tx" data={row} internalHref={objectHref("transactions",row,row.txHash)}/>}
-        amount={(value,row)=><Amount value={value} data={row}/>}
+        amount={(value,row)=><Amount value={value} data={{...data,...row}} compact/>}
         href={(collection,row,value)=>objectHref(collection,row,value)}/>
       <div className="pagination">
         <span>{t("paginationSummary").replace("{total}",String(data.activities?.total ?? 0)).replace("{page}",String(result.page))}</span>
@@ -903,7 +934,7 @@ function App() {
     } catch {}
   }, [language]);
   return (
-    <Context.Provider value={{ t, metadata: metadata.data ?? {} }}>
+    <Context.Provider value={{ t, metadata: metadata.data ?? {}, metadataPending: !metadata.data }}>
       <header>
         <div className="nav">
           <Link className="brand" to="/" aria-label="InvisiPay · Explorer">

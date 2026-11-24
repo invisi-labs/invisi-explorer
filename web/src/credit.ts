@@ -16,3 +16,12 @@ export function creditSlotId(op: RecordData, ref: RecordData): string | undefine
   if (![op.protocolAddress, op.tokenAddress, ref.payer].every(v => typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v))) return;
   return [op.chainId, op.protocolAddress.toLowerCase(), op.tokenAddress.toLowerCase(), ref.payer.toLowerCase(), ref.grantId].join(":");
 }
+
+export function grantStatusKey(data: RecordData): import("./i18n").Key {
+ if (["pre_revoked", "revoked_after_creation", "revocation_unconfirmed"].includes(data.lifecycleStatus)) return "creditGrantRevoked";
+ const status = String(data.chainState?.status ?? data.status ?? "");
+ return data.authorizationStatus === "active" || status === "1" ? "creditGrantActive" : data.authorizationStatus === "revoked" || status === "2" ? "creditGrantRevoked" : "fundingUnknown";
+}
+export function compactIdentifier(value: string): string {
+ return value.length > 18 ? value.slice(0, 8) + "…" + value.slice(-6) : value;
+}

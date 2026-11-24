@@ -162,7 +162,7 @@ export function finalityKey(value: unknown): import("./i18n").Key {
 
 // Unknown or missing evidence remains visible; only explicitly inapplicable records are hidden.
 export function showsSourceRecognition(type: string, data: Record<string, unknown> | undefined): boolean {
-  if (type === "credit-states") return false;
+  if (type && type !== "transactions" && type !== "notes") return false;
   const rows = Array.isArray(data?.recognition)
     ? data.recognition
     : data?.recognition && typeof data.recognition === "object" ? [data.recognition] : [];
