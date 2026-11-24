@@ -64,7 +64,10 @@ func Run(ctx context.Context, c config.Config) error {
 	for _, v := range c.Chains {
 		scopes = append(scopes, upstream.Scope(v))
 	}
-	eview := explorer.New(store.DB, explorer.Options{TransactionObservation: func(ctx context.Context, op model.Operation) (*model.TransactionObservation, error) {
+	livePublicState := &publicState{syncer: syncer, chains: c.Chains}
+	eview := explorer.New(store.DB, explorer.Options{BroadcasterDirectory: func(ctx context.Context) ([]model.BroadcasterDirectory, error) {
+		return cachedBroadcasters(ctx, store, c.Chains)
+	}, TransactionObservation: func(ctx context.Context, op model.Operation) (*model.TransactionObservation, error) {
 		return syncer.TransactionObservation(ctx, lookup(op.ChainID, op.ProtocolAddress), op)
 	}, Dialect: "sqlite", CursorKey: key, Scopes: scopes, MetadataProvider: func(ctx context.Context) (any, error) { return cachedMetadata(ctx, store, c) }, PublicState: &publicState{syncer: syncer, chains: c.Chains}, Recognition: func(ctx context.Context, op model.Operation) (any, error) {
 		return syncer.Recognition(ctx, lookup(op.ChainID, op.ProtocolAddress), op)
@@ -182,10 +185,10 @@ func Run(ctx context.Context, c config.Config) error {
 			}
 		}()
 	}
+
+	probeClient := upstream.BroadcasterClient()
+	defer probeClient.CloseIdleConnections()
 	for _, chain := range c.Chains {
-		if chain.BroadcasterURL == "" {
-			continue
-		}
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
@@ -196,13 +199,15 @@ func Run(ctx context.Context, c config.Config) error {
 				case <-workerCtx.Done():
 					return
 				case <-timer.C:
-					status, _ := upstream.ProbeBroadcaster(workerCtx, client, chain)
-					_ = store.SourceStatus(workerCtx, upstream.Scope(chain), "broadcaster", status.Status, status)
-					timer.Reset(c.PollDuration())
+					probeCtx, stop := context.WithTimeout(workerCtx, 45*time.Second)
+					_ = refreshBroadcasters(probeCtx, store, livePublicState, probeClient, chain)
+					stop()
+					timer.Reset(30 * time.Second)
 				}
 			}
 		}()
 	}
+
 	defer func() { cancel(); workers.Wait() }()
 	server := &http.Server{Addr: c.Listen, Handler: Handler(eview, c.WebDir), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	done := make(chan error, 1)

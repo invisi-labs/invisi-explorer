@@ -456,3 +456,21 @@ nav .advanced-tools-panel a { display: flex; border-radius: 8px; white-space: no
  .public-list .copy-button { opacity: 0; pointer-events: none; }
  .public-list tr:hover .copy-button, .public-list tr:focus-within .copy-button { opacity: 1; pointer-events: auto; }
 }
+.broadcasters-table small { display: block; margin-top: 4px; font-size: 11px; }
+.broadcasters-table td { vertical-align: middle; }
+.bc-capabilities { display: flex; flex-wrap: wrap; gap: 4px; }
+.bc-capabilities > span { padding: 3px 7px; font-size: 11px; color: var(--secondary); border: 1px solid var(--line); border-radius: 6px; white-space: nowrap; }
+.bc-detail { min-width: 0; }
+.bc-status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 24px; }
+.bc-detail-hint { display: block; font-size: 12px; color: var(--secondary); margin-top: 4px; }
+.bc-statistics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px 24px; margin: 20px 0 0; }
+.bc-statistics > div { min-width: 0; }
+.bc-statistics dt { font-size: 12px; color: var(--secondary); margin-bottom: 6px; }
+.bc-statistics dd { font-size: 21px; margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.bc-technical > summary { color: var(--ink); font-weight: 600; padding: 0; }
+.bc-technical[open] > summary { margin-bottom: 20px; }
+@media(max-width:700px) {
+ .bc-statistics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .broadcasters-table tbody tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; border-bottom: 1px solid var(--line); padding: 16px 0; }
+ .broadcasters-table td:first-child, .broadcasters-table td:nth-child(2), .broadcasters-table td:last-child { grid-column: 1 / -1; }
+}

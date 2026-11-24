@@ -24,6 +24,7 @@ import (
 )
 
 type Options struct {
+	BroadcasterDirectory   func(context.Context) ([]model.BroadcasterDirectory, error)
 	TransactionObservation func(context.Context, model.Operation) (*model.TransactionObservation, error)
 	PublicState            PublicState
 	Dialect                string

@@ -22,6 +22,7 @@ import {
 } from "./public";
 import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
+import { BroadcastersPanel } from "./BroadcastersPanel";
 import { AdvancedTools } from "./AdvancedTools";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
@@ -933,6 +934,32 @@ function LanguagePicker({ language, onChange, label }: {
     </div>}
   </div>;
 }
+function BroadcasterPresentation({data,detail=false}:{data:RecordData;detail?:boolean}) {
+ const {t}=useContext(Context);
+ return <BroadcastersPanel data={data} detail={detail} t={t} network={row=><Network data={row}/>}
+  token={(tokenAddress,row)=><GrantToken data={{...row,tokenAddress}}/>}
+  address={(value,row)=><Address value={value} data={row} kind="address"/>}
+  href={row=>objectHref("broadcasters",row,row.operator)}/>;
+}
+function BroadcasterList() {
+ const {t}=useContext(Context);const result=useCursorPagination<RecordData>("/broadcasters");
+ useEffect(()=>{const timer=setInterval(result.retry,30000);return ()=>clearInterval(timer);},[result.retry]);
+ return <><h1>{t("broadcasters")}</h1>{!result.data?<State {...result}/>:<>
+  {result.error&&<p className="pagination-message" role="alert">{t("bcQueryUnavailable")} <button onClick={result.retry}>{t("retry")}</button></p>}
+  <BroadcasterPresentation data={result.data}/>
+  <div className="pagination"><span>{t("paginationSummary").replace("{total}",String(result.data.total ?? "—")).replace("{page}",String(result.page))}</span><div>
+   <button disabled={result.loading||result.page===1} onClick={result.previous}>{t("previous")}</button>
+   <button disabled={result.loading||!!result.error||!result.data.nextCursor} onClick={result.next}>{t("next")}</button>
+  </div></div>
+ </>}</>;
+}
+function BroadcasterDetail({id}:{id:string}) {
+ const {t}=useContext(Context);const location=useLocation();
+ const result=useData<RecordData>("/broadcasters/"+encodeURIComponent(id)+location.search,30000);
+ return <><p><Link to="/broadcasters">{t("broadcastersNav")}</Link> /</p><h1>{t("broadcasters")}</h1>
+  {!result.data?<State {...result}/>:<>{result.error&&<p className="pagination-message" role="alert">{t("bcQueryUnavailable")} <button onClick={result.retry}>{t("retry")}</button></p>}<BroadcasterPresentation data={result.data} detail/></>}
+ </>;
+}
 function App() {
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const metadata = useData<RecordData>("/metadata", 30000);
@@ -979,7 +1006,7 @@ function App() {
             <h1>{t("diagnostics")}</h1>
             <Diagnostics />
           </>
-        ) : routes.includes(type as Key) ||
+        ) : type === "broadcasters" ? (id ? <BroadcasterDetail key={location.pathname+location.search} id={decodeURIComponent(id)}/> : <BroadcasterList/>) : routes.includes(type as Key) ||
           type === "addresses" ||
           type === "commitments" ? (
           id ? type === "grants" ? (

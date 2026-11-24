@@ -119,6 +119,9 @@ func directorySource(page publicchain.DirectoryPage) map[string]any {
 	return map[string]any{"chainId": page.ChainID, "protocolAddress": page.ProtocolAddress, "status": page.Status, "reason": page.Reason, "anchor": page.Anchor, "registryAddress": page.RegistryAddress, "registryCodeHash": page.RegistryCodeHash}
 }
 func (e *Explorer) directory(ctx context.Context, q query, id string) (any, error) {
+	if e.options.BroadcasterDirectory != nil {
+		return e.cachedDirectory(ctx, q, id)
+	}
 	if q.kind != "" || q.token != "" || q.namespace != "" {
 		return nil, publicError("INVALID_PARAMS")
 	}
