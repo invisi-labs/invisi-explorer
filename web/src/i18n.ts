@@ -46,7 +46,8 @@ const en = {
   fundingTransactionTo: "Transaction recipient",
   fundingDirectCore: "Direct call to Core",
   fundingRegularTransaction: "Regular transaction (Type {type})",
-  fundingSubmitter: "Transaction submitter / Broadcaster",
+  fundingSubmitter: "Transaction submitter",
+  fundingCoreRecipient: "Recipient contract (Core)",
   fundingSubmitterCaveat:
     "The submitter pays transaction gas and may be a player or relay. This does not establish funding ownership or a registered Broadcaster identity.",
   fundingFeeRecipient: "Core service fee recipient",
@@ -391,7 +392,8 @@ const hans: Record<keyof typeof en, string> = {
   fundingTransactionTo: "交易接收地址",
   fundingDirectCore: "直接调用 Core",
   fundingRegularTransaction: "普通交易（Type {type}）",
-  fundingSubmitter: "交易提交者 / Broadcaster",
+  fundingSubmitter: "交易提交者",
+  fundingCoreRecipient: "接收合约（Core）",
   fundingSubmitterCaveat:
     "提交者支付交易 gas，可能是玩家或代发方；不能据此认定本金来源或已注册 Broadcaster 身份。",
   fundingFeeRecipient: "Core 服务费收款地址",
@@ -724,7 +726,8 @@ const hant: Record<keyof typeof en, string> = {
   fundingTransactionTo: "交易接收地址",
   fundingDirectCore: "直接呼叫 Core",
   fundingRegularTransaction: "一般交易（Type {type}）",
-  fundingSubmitter: "交易提交者 / Broadcaster",
+  fundingSubmitter: "交易提交者",
+  fundingCoreRecipient: "接收合約（Core）",
   fundingSubmitterCaveat:
     "提交者支付交易 gas，可能是玩家或代發方；不能據此認定本金來源或已註冊 Broadcaster 身分。",
   fundingFeeRecipient: "Core 服務費收款地址",

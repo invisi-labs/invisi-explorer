@@ -45,9 +45,9 @@ export const termStrings = {
     "Position of the commitment in its Merkle tree. It must be interpreted with the tree ID and is not globally unique.",
   ],
   termHelp_fundingSubmitter: [
-    "提交外层交易并支付 Gas 的地址。它可能是交易代发者，不能据此认定其为实际出资人。",
-    "提交外層交易並支付 Gas 的地址，可能是交易代發者，不能據此認定為實際出資人。",
-    "The address submitting the outer transaction and paying gas. It may be a relay and must not be assumed to be the actual funder.",
+    "提交外层交易并支付 Gas 的地址。它可能是代发方；不能仅凭此地址认定实际出资人或已注册的代发服务身份。",
+    "提交外層交易並支付 Gas 的地址，可能是代發方；不能僅憑此地址認定實際出資人或已註冊的代發服務身分。",
+    "The address submitting the outer transaction and paying gas. It may be a relay; the address alone does not establish the actual funder or a registered Broadcaster identity.",
   ],
   termHelp_fundingType: [
     "链上外层交易的封装类型，例如 EIP-7702。它与内部操作是转账、入金还是授信是不同的分类。",

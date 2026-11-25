@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplify transaction execution labels, move submitter caveats into contextual help, and combine recipient/Core addresses only when they match.
+
 - Show input Nullifiers in a responsive table matching output Note commitments, retaining per-row copying and scoped detail links.
 
 - Use consistent input-nullifier and output-Note-commitment terminology. Separate outer transaction execution from per-operation public funding for both single and aggregate transactions.
