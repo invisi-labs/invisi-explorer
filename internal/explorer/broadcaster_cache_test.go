@@ -47,3 +47,29 @@ func TestCachedBroadcasterDirectoryPagesAndIdentityChanges(t *testing.T) {
 		t.Fatal(value)
 	}
 }
+
+func TestBroadcasterServiceDetailKeepsAllNetworkAndDeploymentRegistrations(t *testing.T) {
+	e, _, scope, _ := fixture(t)
+	operator := "0x" + strings.Repeat("1", 40)
+	secondCore := "0x" + strings.Repeat("2", 40)
+	directories := []model.BroadcasterDirectory{}
+	for _, pair := range [][2]string{{scope.ChainID, scope.ProtocolAddress}, {"1", scope.ProtocolAddress}, {scope.ChainID, secondCore}} {
+		directories = append(directories, model.BroadcasterDirectory{ChainID: pair[0], ProtocolAddress: pair[1], Status: "verified", Complete: true, CheckedAt: time.Now().Unix(), Items: []model.BroadcasterEntry{{Broadcaster: publicchain.Broadcaster{Operator: operator, Endpoint: "https://relay.example/v1/" + pair[0], Enabled: true}, ChainID: pair[0], ProtocolAddress: pair[1], ID: operator}}})
+	}
+	e.options.BroadcasterDirectory = func(context.Context) ([]model.BroadcasterDirectory, error) { return directories, nil }
+	value, err := e.Public(context.Background(), "/broadcasters/"+operator, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := value.(map[string]any)["occurrences"].([]model.BroadcasterEntry)
+	if len(entries) != 3 {
+		t.Fatalf("expected all three registrations, got %d", len(entries))
+	}
+	scoped, err := e.Public(context.Background(), "/broadcasters/"+operator, url.Values{"chainId": {scope.ChainID}, "protocolAddress": {scope.ProtocolAddress}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := scoped.(map[string]any)["occurrences"]; exists {
+		t.Fatal("scoped API query unexpectedly mixed registrations")
+	}
+}

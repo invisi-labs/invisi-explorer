@@ -571,3 +571,20 @@ footer.site-footer { display: block; max-width: none; margin: 48px 0 0; padding:
 .settings-link { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none; border: 1px solid var(--line); border-radius: 8px; color: var(--secondary); }
 .settings-link:hover { color: var(--ink); background: var(--surface); }
 @media(max-width:767px) { .settings-row { grid-template-columns: minmax(0,1fr); gap: 12px; padding: 20px 0; }.settings-preview { padding: 16px; } }
+
+.bc-service-overview h2 { margin-bottom:12px; }
+.bc-scope-counts { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:13px; color:var(--secondary); margin:16px 0 20px; }
+.bc-network-picker { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:20px 0; }
+.bc-network-picker > button { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; min-height:44px; background:#fff; border:1px solid var(--line); border-radius:10px; }
+.bc-network-picker > button[aria-pressed=true] { background:var(--purple-soft); border-color:var(--purple); color:var(--purple-ink); }
+.bc-deployment-picker { display:flex; flex-direction:column; gap:8px; max-width:560px; min-width:0; }
+.bc-deployment-picker > label,.bc-deployment-label,.bc-active-deployment > span { color:var(--secondary); font-size:12px; }
+.bc-deployment-select > select { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; font-family:monospace; font-size:12px; }
+.bc-active-deployment { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; margin:16px 0; }
+@media(max-width:767px) { .bc-network-picker > button { max-width:100%; }.bc-deployment-picker { max-width:100%; }.bc-active-deployment .identifier { max-width:100%; } }
+
+.bc-deployment-select { position:relative; min-width:0; }
+.bc-deployment-select > select { appearance:none; -webkit-appearance:none; padding-right:44px; cursor:pointer; }
+.bc-deployment-select > svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--secondary); }
+.bc-deployment-select > select:focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
+.bc-deployment-value { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-height:32px; overflow-wrap:anywhere; min-width:0; }

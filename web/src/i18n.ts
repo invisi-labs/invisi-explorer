@@ -1,6 +1,14 @@
 import { termStrings } from "./termStrings";
 export type Language = "en" | "zh-Hans" | "zh-Hant";
 const en = {
+  bcScopeHint: "Networks and deployments discovered for this service and operator in Explorer. Each scope has its own registration, health and token policies.",
+  bcNetworkCount: "Networks discovered: {count}",
+  bcDeploymentCount: "Registered deployments: {count}",
+  bcNetworkSelection: "Service networks",
+  bcDeploymentSelection: "Core deployment",
+  bcSelectedScope: "Selected network and deployment",
+  bcDefaultMissing: "The linked network or deployment is not in the discovered registrations. Showing an available registration; discovery may be incomplete.",
+
   "termHelp_recognition": termStrings["termHelp_recognition"][2],
   "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][2],
   "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][2],
@@ -339,6 +347,14 @@ const en = {
   finalityConflict: "Finalized history conflict",
 };
 const hans: Record<keyof typeof en, string> = {
+  bcScopeHint: "以下为 Explorer 已发现的此服务、此运营地址的网络与部署；注册、健康状态和代币策略按部署独立展示。",
+  bcNetworkCount: "已发现 {count} 个网络",
+  bcDeploymentCount: "{count} 个注册部署",
+  bcNetworkSelection: "服务支持的网络",
+  bcDeploymentSelection: "Core 部署",
+  bcSelectedScope: "当前网络与部署",
+  bcDefaultMissing: "链接指定的网络或部署未出现在已发现的注册中，现展示可用的注册记录；注册发现结果可能尚不完整。",
+
   "termHelp_recognition": termStrings["termHelp_recognition"][0],
   "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][0],
   "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][0],
@@ -664,6 +680,14 @@ const hans: Record<keyof typeof en, string> = {
 };
 const hant: Record<keyof typeof en, string> = {
   ...hans,
+  bcScopeHint: "以下為 Explorer 已發現的此服務、此營運地址的網路與部署；註冊、健康狀態與代幣策略按部署獨立顯示。",
+  bcNetworkCount: "已發現 {count} 個網路",
+  bcDeploymentCount: "{count} 個註冊部署",
+  bcNetworkSelection: "服務支援的網路",
+  bcDeploymentSelection: "Core 部署",
+  bcSelectedScope: "目前網路與部署",
+  bcDefaultMissing: "連結指定的網路或部署未出現在已發現的註冊中，現顯示可用註冊紀錄；發現結果可能尚不完整。",
+
   "termHelp_recognition": termStrings["termHelp_recognition"][1],
   "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][1],
   "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][1],

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Present Broadcaster details as a service with network and Core deployment selection. Preserve URL defaults and independent observations, capability declarations and token policies for each registration.
+
 - Add browser-local display settings for language, device/UTC/custom time zones and relative/full timestamps, with preview and reset. Keep API values unchanged and preserve time-zone context in time tooltips.
 - Unify the ecosystem footer with the InvisiPay website and use compact, accessible mobile navigation. Move source recognition into transaction details, simplify the relay list and clarify relay capabilities.
 

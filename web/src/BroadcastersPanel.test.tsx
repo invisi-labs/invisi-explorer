@@ -38,3 +38,19 @@ it("distinguishes disabled aggregation from missing capability declarations",()=
  const unknown=render(record,true);
  expect(unknown).toContain("Automatic relay aggregation</dt><dd>Not provided");
 });
+
+it("shows one service overview and only the selected network/deployment capabilities",()=>{
+ const rows=[record,{...record,chainId:"1",protocolAddress:"other-core",observation:{...record.observation,status:"halted",tokensStatus:"complete",tokens:[{tokenAddress:"ETH_ONLY",supported:true}]}},{...record,protocolAddress:"second-core",observation:{...record.observation,tokensStatus:"complete",tokens:[{tokenAddress:"SECOND_CORE_ONLY",supported:true}]}}];
+ const html=renderToStaticMarkup(<MemoryRouter><BroadcastersPanel data={{occurrences:rows}} detail selection={{chainId:"97",protocolAddress:"second-core"}} t={t} href={r=>`/broadcasters/${r.operator}`} network={r=><span>Network {r.chainId}</span>} token={value=><span>TOKEN({value})</span>} address={value=><code>{value}</code>}/></MemoryRouter>);
+ expect(html.match(/<h2>relay.example<\/h2>/g)).toHaveLength(1);
+ expect(html).toContain('Networks discovered: 2');expect(html).toContain('Registered deployments: 3');
+ expect(html).toContain('Network 1');expect(html).toContain('second-core');
+ expect(html).toContain('SECOND_CORE_ONLY');expect(html).not.toContain('ETH_ONLY');
+ expect(html).toContain('aria-pressed="true"');
+});
+it("shows a single deployment as read-only rather than an empty-choice dropdown",()=>{
+ const html=render(record,true);
+ expect(html).toContain('bc-deployment-value');
+ expect(html).not.toContain('<select');
+ expect(html).toContain('<code>core</code>');
+});

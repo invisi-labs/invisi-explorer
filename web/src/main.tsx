@@ -26,6 +26,7 @@ import {
 } from "./public";
 import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
+import { broadcasterDetailPath } from "./broadcasterScopes";
 import { BroadcastersPanel } from "./BroadcastersPanel";
 import { ResponsiveHeader } from "./ResponsiveHeader";
 import { AdvancedTools } from "./AdvancedTools";
@@ -881,8 +882,8 @@ function TransactionsPage() {
   );
 }
 function BroadcasterPresentation({data,detail=false}:{data:RecordData;detail?:boolean}) {
- const {t}=useContext(Context);
- return <BroadcastersPanel data={data} detail={detail} t={t} network={row=><Network data={row}/>}
+ const {t}=useContext(Context);const location=useLocation(),navigate=useNavigate();const params=new URLSearchParams(location.search);
+ return <BroadcastersPanel data={data} detail={detail} selection={{chainId:params.get("chainId")??undefined,protocolAddress:params.get("protocolAddress")??undefined}} onSelect={selection=>{const next=new URLSearchParams(location.search);next.set("chainId",selection.chainId!);next.set("protocolAddress",selection.protocolAddress!);navigate({pathname:location.pathname,search:"?"+next.toString()});}} t={t} network={row=><Network data={row}/>}
   token={(tokenAddress,row)=><GrantToken data={{...row,tokenAddress}}/>}
   address={(value,row)=><Address value={value} data={row} kind="address"/>}
   href={row=>objectHref("broadcasters",row,row.operator)}/>;
@@ -900,8 +901,8 @@ function BroadcasterList() {
  </>}</>;
 }
 function BroadcasterDetail({id}:{id:string}) {
- const {t}=useContext(Context);const location=useLocation();
- const result=useData<RecordData>("/broadcasters/"+encodeURIComponent(id)+location.search,30000);
+ const {t}=useContext(Context);
+ const result=useData<RecordData>(broadcasterDetailPath(id),30000);
  return <><p><Link to="/broadcasters">{t("broadcastersNav")}</Link> /</p><h1>{t("broadcasters")}</h1>
   {!result.data?<State {...result}/>:<>{result.error&&<p className="pagination-message" role="alert">{t("bcQueryUnavailable")} <button onClick={result.retry}>{t("retry")}</button></p>}<BroadcasterPresentation data={result.data} detail/></>}
  </>;
