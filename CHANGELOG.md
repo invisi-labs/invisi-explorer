@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Use consistent protocol terminology in public labels and help, and share a lighter violet-neutral palette for surfaces, table headings and summary panels.
+
+- Remove repeated protocol fields from transaction operation details and simplify public-funding labels without the Core prefix.
+
 - Simplify transaction execution labels, move submitter caveats into contextual help, and combine recipient/Core addresses only when they match.
 
 - Show input Nullifiers in a responsive table matching output Note commitments, retaining per-row copying and scoped detail links.

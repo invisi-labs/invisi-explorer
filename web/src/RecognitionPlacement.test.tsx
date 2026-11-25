@@ -58,3 +58,10 @@ it("uses one transaction execution summary and consistent public-funding heading
   expect(html).not.toContain('Funding and execution');
  }
 });
+it("does not repeat transaction-level Core protocol details in operation fields",()=>{
+ fixture.data={...operation,operations:[operation]};
+ fixture.path="/transactions/"+operation.transactionHash;
+ expect(renderToStaticMarkup(application)).not.toMatch(/<dt>Protocol(?:<|$)/);
+ fixture.path="/notes/"+'0x'+'3'.repeat(64);
+ expect(renderToStaticMarkup(application)).toMatch(/<dt>Protocol(?:<|$)/);
+});

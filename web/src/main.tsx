@@ -724,7 +724,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                 <h2>
                   {aggregate ? t("operationNumber").replace("{number}",String(BigInt(op.operationIndex ?? i)+1n)) + " · " + (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind) : t("publicInfo")}
                 </h2>
-                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={!aggregate} />
+                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={type !== "transactions" && !aggregate} />
                 {(aggregate || (type === "transactions" && showRecognition)) && <SourceRecognition data={aggregate ? op : data ?? op} t={t} status={value=><Status value={value}/>}/>}
                 {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={type === "transactions" || aggregate} t={t}
                   address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}

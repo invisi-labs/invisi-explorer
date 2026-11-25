@@ -12,7 +12,7 @@ it("shows one bound outer transaction summary for four members",()=>{
  expect(html.match(/<dt>Transaction submitter/g)).toHaveLength(1);
  expect(html.match(new RegExp(sender,"g"))).toHaveLength(1);
  expect(html).toContain("Regular transaction (Type 0)");
- expect(html).toContain("Recipient contract (Core)");
+ expect(html).toContain("Recipient contract");
 });
 it("does not select the first sender when member observations conflict",()=>{
  const changed=operations.map((op,i)=>i===3?{...op,transactionObservation:{...op.transactionObservation,transactionSender:other}}:op);
@@ -50,11 +50,11 @@ it("keeps submitter explanations in help and collapses a direct Core recipient",
  const html=render([operations[0]]);
  expect(html).not.toContain('<p class="muted">'+dictionaries.en.fundingSubmitterCaveat);
  expect(html.match(new RegExp('<code>'+core+'</code>','g'))).toHaveLength(1);
- expect(html).toContain('Recipient contract (Core)');
+ expect(html).toContain('Recipient contract');
 });
 it("keeps a Router recipient separate from the Core contract",()=>{
  const html=render([{...operations[0],transactionObservation:{...operations[0].transactionObservation,transactionTo:other}}]);
- expect(html).toContain('Transaction recipient');expect(html).toContain('Core contract');
+ expect(html).toContain('Transaction recipient');expect(html).toContain('Protocol contract');
  expect(html).toContain('<code>'+other+'</code>');expect(html).toContain('<code>'+core+'</code>');
- expect(html).not.toContain('Recipient contract (Core)');
+ expect(html).not.toContain('Recipient contract');
 });

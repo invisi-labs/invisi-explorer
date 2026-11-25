@@ -30,9 +30,9 @@ export const termStrings = {
     "The finalized block reported by the node, used to assess indexed data stability. Finality support varies by network and node.",
   ],
   termHelp_protocol: [
-    "处理这些操作的 Core 协议合约。相同网络可能存在多个部署，查询必须与具体合约对应。",
-    "處理操作的 Core 協議合約。同一網路可能有多個部署，查詢須對應具體合約。",
-    "The Core protocol contract handling these operations. A network can host multiple deployments; queries are scoped to the specific contract.",
+    "处理这些操作的 协议合约。相同网络可能存在多个部署，查询必须与具体合约对应。",
+    "處理操作的 協議合約。同一網路可能有多個部署，查詢須對應具體合約。",
+    "The protocol contract handling these operations. A network can host multiple deployments; queries are scoped to the specific contract.",
   ],
   termHelp_treeIdLabel: [
     "保存承诺值的 Merkle 树编号。同一协议可能有多棵树；它不是网络编号。",

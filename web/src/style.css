@@ -1,4 +1,4 @@
-/* InvisiPay 网页端视觉：白底、浅灰层次、紫色操作与隐私强调。 */
+/* InvisiPay 网页端视觉：白底、灰紫层次、紫色操作与隐私强调。 */
 @font-face {
   font-family: Inter;
   src: url('/fonts/inter-latin.woff2') format('woff2');
@@ -24,10 +24,13 @@
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   --ink: #18181b;
-  --secondary: #737782;
-  --muted: #9195a1;
-  --surface: #f7f8fa;
-  --line: #eceef2;
+  --secondary: #686a78;
+  --muted: #6f7282;
+  --surface: #f7f5fb;
+  --surface-subtle: #fcfbfe;
+  --surface-accent: #f2eefb;
+  --surface-hover: #eee9f7;
+  --line: #e9e5f0;
   --purple: #7b61ff;
   --purple-ink: #6447e0;
   --purple-soft: #f1edff;
@@ -46,8 +49,8 @@ button, select {
   font-weight: 500;
   transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
-button:hover:not(:disabled), select:hover { background: #eceef2; }
-button:active:not(:disabled) { background: #e5e7ed; }
+button:hover:not(:disabled), select:hover { background: var(--surface-hover); }
+button:active:not(:disabled) { background: #e5def2; }
 button:disabled { cursor: default; color: var(--muted); background: var(--surface); }
 a { color: var(--purple-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -118,7 +121,7 @@ h3 { font-size: 16px; font-weight: 600; }
 .search {
   display: flex;
   align-items: center;
-  background: var(--surface);
+  background: var(--surface-subtle);
   border: 1px solid var(--line);
   padding: 5px;
   border-radius: 18px;
@@ -143,8 +146,8 @@ h3 { font-size: 16px; font-weight: 600; }
 .search-area > .muted { margin: 10px 4px 0; font-size: 12px; }
 .muted, small { color: var(--secondary); }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.stats a { color: var(--ink); background: var(--surface); border-color: transparent; text-decoration: none; }
-.stats a:hover { border-color: #d9d0ff; background: #f8f6ff; }
+.stats a { color: var(--ink); background: var(--surface-accent); border-color: transparent; text-decoration: none; }
+.stats a:hover { border-color: #d9d0ff; background: var(--surface-hover); }
 .stats a:focus-visible { outline-offset: 2px; }
 .stats span { font-size: 13px; color: var(--secondary); }
 .stats strong {
@@ -160,7 +163,7 @@ h3 { font-size: 16px; font-weight: 600; }
 .section-head > small { font-size: 11px; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; text-align: left; font-size: 13px; }
-th { font-weight: 500; color: var(--secondary); white-space: nowrap; background: var(--surface); }
+th { font-weight: 500; color: var(--secondary); white-space: nowrap; background: var(--surface-subtle); }
 th, td { padding: 14px 12px; border-bottom: 1px solid var(--line); }
 th:first-child { border-radius: 10px 0 0 10px; }
 th:last-child { border-radius: 0 10px 10px 0; }
