@@ -54,7 +54,12 @@ import { OperationNoteInputs } from "./OperationNoteInputs";
 import { SourceRecognition } from "./SourceRecognition";
 import { NoteGenerationLabel, TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
 import { NetworkIcon } from "./NetworkIcon";
-import { DiagnosticsPanel, type DiagnosticsResponse } from "./DiagnosticsPanel";
+import type { DiagnosticsResponse } from "./DiagnosticsPanel";
+import { NetworkDirectory, HomeNetworks } from "./NetworkPanels";
+import { OverviewStats, RecentTransactions } from "./HomePanels";
+import { TransactionFilters } from "./TransactionFilters";
+import { networkGroups, transactionFilterValues, transactionPath } from "./networkDirectory";
+import { Select } from "./Select";
 type RecordData = Record<string, any>;
 type Page = {
   items: RecordData[];
@@ -314,9 +319,11 @@ function principal(r: RecordData) {
 function Listing({
   type = "transactions",
   compact = false,
+  query = "",
 }: {
   type?: string;
   compact?: boolean;
+  query?: string;
 }) {
   const { t } = useContext(Context);
   const nav = useNavigate();
@@ -327,7 +334,7 @@ function Listing({
     const id = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(id);
   }, []);
-  const result = useCursorPagination<Page>("/" + type);
+  const result = useCursorPagination<Page>("/" + type + query);
   const items = result.data?.items ?? [];
   const identityLabel = t(type === "notes" ? "noteCommitmentLabel" : type === "credit-states" ? "creditCommitmentLabel" : type === "transactions" ? "transactionHashLabel" : type === "grants" ? "grantIdLabel" : "hash");
   return (
@@ -773,7 +780,7 @@ function Detail({ type, id }: { type: string; id: string }) {
         <Link
           to={
             type === "addresses"
-              ? "/"
+              ? "/transactions"
               : type === "credit-states"
                 ? "/grants"
                 : "/" + type
@@ -1174,26 +1181,191 @@ function Detail({ type, id }: { type: string; id: string }) {
     </>
   );
 }
+function HomePage() {
+  const { t, metadata, metadataPending } = useContext(Context);
+  const overview = useData<RecordData>("/overview", 30000);
+  const latest = useData<Page>("/transactions?limit=8", 30000);
+  const diagnostics = useData<DiagnosticsResponse>("/diagnostics", 30000);
+  const groups = networkGroups(
+    metadata.networks ?? [],
+    diagnostics.data?.items ?? [],
+  );
+  return (
+    <>
+      <section className="home-hero">
+        <h1>{t("explorerHomeTitle")}</h1>
+        <p className="muted">{t("explorerHomeIntro")}</p>
+        <Search />
+      </section>
+      <OverviewStats
+        totals={overview.data}
+        networkCount={metadataPending ? undefined : groups.length}
+        t={t}
+      />
+      {overview.error && (
+        <State error={overview.error} retry={overview.retry} />
+      )}
+      <div className="home-panels">
+        <div>
+          <HomeNetworks
+            groups={groups}
+            loading={metadataPending}
+            t={t}
+            network={(row) => <Network data={row} />}
+          />
+          {diagnostics.error && (
+            <p className="muted" role="status">
+              {t("syncUnavailable")}{" "}
+              <button className="plain" onClick={diagnostics.retry}>
+                {t("retry")}
+              </button>
+            </p>
+          )}
+        </div>
+        <RecentTransactions
+          rows={latest.data?.items ?? []}
+          t={t}
+          state={
+            !latest.data ? (
+              <State {...latest} />
+            ) : latest.error ? (
+              <p role="alert">
+                {t("unavailable")}{" "}
+                <button onClick={latest.retry}>{t("retry")}</button>
+              </p>
+            ) : !latest.data.items?.length ? (
+              <State empty />
+            ) : undefined
+          }
+          record={(row) => (
+            <>
+              <div className="home-tx-main">
+                <Address
+                  value={row.txHash ?? row.transactionHash}
+                  data={row}
+                  compact
+                  internalHref={objectHref("transactions", row)}
+                />
+                <Status value={row.executionStatus ?? row.success} />
+              </div>
+              <div className="home-tx-context">
+                <Network data={row} />
+                <TransactionOperationLabel data={row} t={t} />
+                <span className="home-tx-amount">
+                  <TransactionAmounts
+                    data={row}
+                    amount={(value, token) => (
+                      <Amount
+                        value={value}
+                        data={{ ...row, tokenAddress: token }}
+                        compact
+                      />
+                    )}
+                    fallback={
+                      principal(row) !== undefined ? (
+                        <Amount value={principal(row)} data={row} compact />
+                      ) : (
+                        "—"
+                      )
+                    }
+                  />
+                </span>
+                <time title={fullTime(row.timestamp)}>
+                  {age(row.timestamp, Date.now(), t)}
+                </time>
+              </div>
+            </>
+          )}
+        />
+      </div>
+    </>
+  );
+}
 function TransactionsPage() {
-  const { t } = useContext(Context);
-  const result = useData<RecordData>("/overview");
+  const { t, metadata } = useContext(Context);
+  const location = useLocation(),
+    navigate = useNavigate();
+  const filters = transactionFilterValues(location.search);
+  const path = transactionPath(filters);
+  const query = path.includes("?") ? path.slice(path.indexOf("?")) : "";
   return (
     <>
       <h1>{t("transactions")}</h1>
+      <p className="muted">{t("transactionPageIntro")}</p>
       <Search />
-      <div className="stats">
-        {(["transactions", "notes", "grants"] as const).map((key) => (
-          <Link className="card" to={key === "transactions" ? "/" : "/" + key} key={key}>
-            <span>{t(key)}</span>
-            <strong>
-              {result.data?.[key] ??
-                "—"}
-            </strong>
-          </Link>
-        ))}
+      <TransactionFilters
+        value={filters}
+        networks={metadata.networks ?? []}
+        tokens={metadata.tokens ?? []}
+        t={t}
+        onChange={(next) => navigate(transactionPath(next))}
+      />
+      <Listing key={path} type="transactions" query={query} />
+    </>
+  );
+}
+function NetworksPage() {
+  const { t, metadata, metadataPending } = useContext(Context);
+  const location = useLocation(),
+    navigate = useNavigate();
+  const selected = new URLSearchParams(location.search).get("chainId") ?? "";
+  const diagnostics = useData<DiagnosticsResponse>("/diagnostics", 30000);
+  const groups = networkGroups(
+    metadata.networks ?? [],
+    diagnostics.data?.items ?? [],
+  );
+  return (
+    <>
+      <h1>{t("networksContracts")}</h1>
+      <p className="muted">{t("networkPageIntro")}</p>
+      <div className="network-page-filter">
+        <label>{t("network")}</label>
+        <Select
+          label={t("network")}
+          value={selected}
+          onChange={(chainId) =>
+            navigate(
+              chainId
+                ? "/networks?chainId=" + encodeURIComponent(chainId)
+                : "/networks",
+            )
+          }
+          options={[
+            { value: "", label: t("allNetworks") },
+            ...groups.map((group) => ({
+              value: group.chainId,
+              label: group.name ?? t("unknown"),
+              icon: <NetworkIcon chainId={group.chainId} />,
+            })),
+          ]}
+        />
       </div>
-      {result.error && <State error={result.error} retry={result.retry} />}
-      <Listing compact />
+      {diagnostics.error && (
+        <p role="alert">
+          {t("syncUnavailable")}{" "}
+          <button onClick={diagnostics.retry}>{t("retry")}</button>
+        </p>
+      )}
+      {metadataPending && !groups.length ? (
+        <State loading />
+      ) : (
+        <NetworkDirectory
+          groups={groups.filter(
+            (group) => !selected || group.chainId === selected,
+          )}
+          t={t}
+          network={(row) => <Network data={row} />}
+          tokens={metadata.tokens ?? []}
+          address={(value, row) => (
+            <Address
+              value={value}
+              data={row}
+              kind="address"
+              internalHref={objectHref("addresses", row, value)}
+            />
+          )}
+        />
+      )}
     </>
   );
 }
@@ -1237,52 +1409,135 @@ function App() {
     } catch {}
   }, [language]);
   return (
-    <Context.Provider value={{ t, metadata: metadata.data ?? {}, metadataPending: !metadata.data }}>
-      <ResponsiveHeader navigationLabel={t("all")} openLabel={t("openNavigation")} closeLabel={t("closeNavigation")}
-        brand={<Link className="brand" to="/" aria-label="InvisiPay · Explorer">
-            <img className="brand-mark" src="/assets/invisipay-mark.svg" alt="" width="32" height="32" />
-            <span className="brand-name">Invisi<span className="brand-pay">Pay</span></span>
+    <Context.Provider
+      value={{
+        t,
+        metadata: metadata.data ?? {},
+        metadataPending: !metadata.data,
+      }}
+    >
+      <ResponsiveHeader
+        navigationLabel={t("all")}
+        openLabel={t("openNavigation")}
+        closeLabel={t("closeNavigation")}
+        brand={
+          <Link className="brand" to="/" aria-label="InvisiPay · Explorer">
+            <img
+              className="brand-mark"
+              src="/assets/invisipay-mark.svg"
+              alt=""
+              width="32"
+              height="32"
+            />
+            <span className="brand-name">
+              Invisi<span className="brand-pay">Pay</span>
+            </span>
             <span className="brand-product">Explorer</span>
-          </Link>}
-        actions={<Link className="settings-link" to="/settings" aria-label={settingsLabel(language)} title={settingsLabel(language)}>
-         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m9.5 3-.6 2.1-2 .9-2-.5-2.5 4.3 1.5 1.6v2.2l-1.5 1.6 2.5 4.3 2-.5 2 .9.6 2.1h5l.6-2.1 2-.9 2 .5 2.5-4.3-1.5-1.6v-2.2l1.5-1.6-2.5-4.3-2 .5-2-.9L14.5 3Z"/><circle cx="12" cy="12" r="3"/></svg>
-        </Link>}>
-        {routes.filter(r=>!["credit-states","nullifiers","trees","roots"].includes(r)).map((r) => (
-            <Link
-              key={r}
-              to={r === "transactions" ? "/" : "/" + r}
-              aria-current={type === r || (type === "credit-states" && r === "grants") || (!type && r === "transactions") ? "page" : undefined}
+          </Link>
+        }
+        actions={
+          <Link
+            className="settings-link"
+            to="/settings"
+            aria-label={settingsLabel(language)}
+            title={settingsLabel(language)}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
             >
-              {t(r === "broadcasters" ? "broadcastersNav" : r)}
-            </Link>
-          ))}
-          <AdvancedTools t={t}/>
+              <path d="m9.5 3-.6 2.1-2 .9-2-.5-2.5 4.3 1.5 1.6v2.2l-1.5 1.6 2.5 4.3 2-.5 2 .9.6 2.1h5l.6-2.1 2-.9 2 .5 2.5-4.3-1.5-1.6v-2.2l1.5-1.6-2.5-4.3-2 .5-2-.9L14.5 3Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </Link>
+        }
+      >
+        <Link to="/" aria-current={!type ? "page" : undefined}>
+          {t("home")}
+        </Link>
+        {(
+          [
+            "transactions",
+            "notes",
+            "grants",
+            "networks",
+            "broadcasters",
+          ] as const
+        ).map((r) => (
+          <Link
+            key={r}
+            to={"/" + r}
+            aria-current={
+              type === r ||
+              (type === "diagnostics" && r === "networks") ||
+              (type === "credit-states" && r === "grants")
+                ? "page"
+                : undefined
+            }
+          >
+            {t(
+              r === "broadcasters"
+                ? "broadcastersNav"
+                : r === "networks"
+                  ? "networksContracts"
+                  : r,
+            )}
+          </Link>
+        ))}
+        <AdvancedTools t={t} />
       </ResponsiveHeader>
       <main>
-        {type === "settings" ? (<SettingsPage language={language} onLanguageChange={setLanguage} defaultLanguage={initialLanguage}/>) : type === "transactions" && !id ? (
-          <Navigate to={{ pathname: "/", search: location.search, hash: location.hash }} replace />
-        ) : !type ? (
+        {type === "settings" ? (
+          <SettingsPage
+            language={language}
+            onLanguageChange={setLanguage}
+            defaultLanguage={initialLanguage}
+          />
+        ) : type === "transactions" && !id ? (
           <TransactionsPage />
+        ) : !type ? (
+          <HomePage />
+        ) : type === "networks" && !id ? (
+          <NetworksPage />
         ) : type === "diagnostics" && !id ? (
-          <>
-            <h1>{t("diagnostics")}</h1>
-            <Diagnostics />
-          </>
-        ) : type === "broadcasters" ? (id ? <BroadcasterDetail key={location.pathname+location.search} id={decodeURIComponent(id)}/> : <BroadcasterList/>) : routes.includes(type as Key) ||
-          type === "addresses" ||
-          type === "commitments" ? (
-          id ? type === "grants" ? (
-            <GrantDetail key={location.pathname + location.search} id={decodeURIComponent(id)}/>
-          ) : (
-            <Detail
+          <Navigate
+            to={{ pathname: "/networks", search: location.search }}
+            replace
+          />
+        ) : type === "broadcasters" ? (
+          id ? (
+            <BroadcasterDetail
               key={location.pathname + location.search}
-              type={type}
               id={decodeURIComponent(id)}
             />
           ) : (
+            <BroadcasterList />
+          )
+        ) : routes.includes(type as Key) ||
+          type === "addresses" ||
+          type === "commitments" ? (
+          id ? (
+            type === "grants" ? (
+              <GrantDetail
+                key={location.pathname + location.search}
+                id={decodeURIComponent(id)}
+              />
+            ) : (
+              <Detail
+                key={location.pathname + location.search}
+                type={type}
+                id={decodeURIComponent(id)}
+              />
+            )
+          ) : (
             <>
               <h1>{t(type as Key)}</h1>
-              <ObjectDescription type={type}/>
+              <ObjectDescription type={type} />
               <Search />
               <Listing key={type} type={type} />
             </>
@@ -1293,19 +1548,6 @@ function App() {
       </main>
       <SiteFooter language={language} />
     </Context.Provider>
-  );
-}
-function Diagnostics() {
-  const { t } = useContext(Context);
-  const result = useData<DiagnosticsResponse>("/diagnostics");
-  return result.data ? (
-    <DiagnosticsPanel
-      items={result.data.items}
-      t={t}
-      network={(record) => <Network data={record} />}
-    />
-  ) : (
-    <State {...result} />
   );
 }
 createRoot(document.getElementById("root")!).render(

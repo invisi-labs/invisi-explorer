@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a Home overview with a deduplicated supported-network count and side-by-side network/recent-transaction panels. Move full cursor-based transaction filtering to `/transactions`, and replace Sync Status navigation with a network/contract directory retaining per-deployment synchronization data. Redirect legacy `/diagnostics` links to `/networks`.
+
 - Paginate address activities and object/root/tree occurrence records. Continue public search beyond 200 matches using authenticated snapshot cursors, retain rows on transient failures, and recover after reorg/generation changes.
 
 - Add a responsive search-type selector for transactions, addresses, Note and credit-state commitments, Nullifiers and Merkle roots, with type-scoped backend queries and updated placeholders.

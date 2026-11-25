@@ -9,7 +9,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return {
     ...actual,
     BrowserRouter: ({ children }: { children: ReactNode }) => (
-      <actual.MemoryRouter initialEntries={["/diagnostics"]}>
+      <actual.MemoryRouter initialEntries={["/networks"]}>
         {children}
       </actual.MemoryRouter>
     ),
@@ -25,19 +25,19 @@ beforeAll(async () => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
-it("keeps diagnostics separate from transaction search and pagination", () => {
+it("replaces the standalone sync page with Networks & contracts", () => {
   const html = renderToStaticMarkup(application);
   const main = html.match(/<main>([\s\S]*?)<\/main>/)?.[1];
-  expect(main).toContain("Sync Status");
+  expect(main).toContain("Networks &amp; contracts");
+  expect(main).toContain("Network");
   expect(main).not.toContain("<form");
   expect(main).not.toContain("pagination");
+  expect(html).not.toContain('href="/diagnostics"');
+  expect(html).toContain('href="/networks"');
 });
-
-it("offers diagnostics through one navigation entry without a duplicate footer dialog", () => {
+it("keeps network discovery out of settings and footer dialogs", () => {
   const html = renderToStaticMarkup(application);
-  expect(html.match(/href="\/diagnostics"/g)).toHaveLength(1);
   const footer = html.match(/<footer\b[^>]*>([\s\S]*?)<\/footer>/)?.[1];
-  expect(footer).toBeDefined();
   expect(footer).toContain("Invisi Labs");
   expect(footer).not.toContain("<button");
   expect(html).not.toContain('role="dialog"');

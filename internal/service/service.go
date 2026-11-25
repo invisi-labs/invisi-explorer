@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -261,7 +262,14 @@ func cursorKey(path string) ([]byte, error) {
 func metadata(c config.Config) any {
 	networks := []any{}
 	for _, chain := range c.Chains {
-		networks = append(networks, map[string]any{"chainId": chain.ChainID, "protocolAddress": chain.ProtocolAddress, "name": chain.Name, "environment": chain.Environment, "explorerUrl": chain.ExplorerURL})
+		deployment := map[string]any{"chainId": chain.ChainID, "protocolAddress": chain.ProtocolAddress, "name": chain.Name, "environment": chain.Environment, "explorerUrl": chain.ExplorerURL}
+		if chain.StartBlock > 0 {
+			deployment["startBlock"] = strconv.FormatUint(chain.StartBlock, 10)
+		}
+		if chain.CodeHash != "" {
+			deployment["codeHash"] = chain.CodeHash
+		}
+		networks = append(networks, deployment)
 	}
 	return map[string]any{"name": "Invisi Explorer", "apiVersion": "v1", "networks": networks, "tokens": c.Tokens}
 }
@@ -314,7 +322,7 @@ func Handler(e *explorer.Explorer, webDir string) http.Handler {
 		}
 		allowedAsset := strings.HasPrefix(r.URL.Path, "/assets/") || strings.HasPrefix(r.URL.Path, "/fonts/") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/favicon.svg" || r.URL.Path == "/index.html"
 		first := strings.Split(strings.Trim(r.URL.Path, "/"), "/")[0]
-		appRoute := first == "" || first == "transactions" || first == "notes" || first == "credit-states" || first == "commitments" || first == "nullifiers" || first == "grants" || first == "trees" || first == "roots" || first == "addresses" || first == "broadcasters" || first == "diagnostics" || first == "search"
+		appRoute := first == "" || first == "transactions" || first == "notes" || first == "credit-states" || first == "commitments" || first == "nullifiers" || first == "grants" || first == "trees" || first == "roots" || first == "addresses" || first == "broadcasters" || first == "diagnostics" || first == "networks" || first == "settings" || first == "search"
 		if !allowedAsset && !appRoute {
 			http.NotFound(w, r)
 			return
