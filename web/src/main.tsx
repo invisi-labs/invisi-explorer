@@ -2,7 +2,7 @@ import {SettingsPage,settingsLabel} from "./SettingsPage";
 import {displayTimeZone,readDisplayPreferences} from "./displayPreferences";
 import {useDisplayPreferenceUpdates} from "./useDisplayPreferenceUpdates";
 import { SiteFooter } from "./SiteFooter";
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -27,6 +27,10 @@ import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
 import { broadcasterDetailPath } from "./broadcasterScopes";
 import { SearchForm } from "./SearchForm";
+import { CursorPager } from "./pagination";
+import { PageControls } from "./PageControls";
+import { RecordTable } from "./RecordTable";
+import { recordRows } from "./recordPages";
 import {
   searchPublic,
   validateTypedSearch,
@@ -40,7 +44,7 @@ import { TermHelp } from "./TermHelp";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
 import { AddressReference } from "./AddressReference";
-import { useCursorPagination } from "./useCursorPagination";
+import { useCursorPagination, usePager } from "./useCursorPagination";
 import { CreditOperationPanel } from "./CreditOperationPanel";
 import { GrantHistory } from "./GrantHistory";
 import { grantStatusKey, compactIdentifier, isCreditOperation } from "./credit";
@@ -488,97 +492,152 @@ function Listing({
     </section>
   );
 }
-function Search() {
+function SearchResults({ query, type }: { query: string; type: SearchType }) {
   const { t } = useContext(Context);
   const nav = useNavigate();
+  const pager = useMemo(
+    () =>
+      new CursorPager((cursor, signal) =>
+        searchPublic(query, type, signal, { cursor, limit: 20 }),
+      ),
+    [query, type],
+  );
+  const result = usePager(pager);
+  const data = result.data;
+  useEffect(() => {
+    if (
+      !result.loading &&
+      !result.error &&
+      result.page === 1 &&
+      data?.results.length === 1 &&
+      !data.truncated &&
+      !data.nextCursor &&
+      (data.total === undefined || data.total === "1")
+    ) {
+      const row = data.results[0];
+      nav(
+        objectHref(
+          collectionFor(row.type),
+          row,
+          row.hash ?? objectIdentity(collectionFor(row.type), row),
+        ),
+      );
+    }
+  }, [data, result.loading, result.error, result.page, nav]);
+  return (
+    <section className="card" aria-busy={result.loading}>
+      <h2>{t("searchResults")}</h2>
+      {result.notice && (
+        <p role="status">
+          {t(
+            result.notice === "updated"
+              ? "paginationUpdated"
+              : "paginationRestarted",
+          )}
+        </p>
+      )}
+      {result.error && (
+        <div role="alert">
+          <p>{t("unavailable")}</p>
+          <button onClick={result.retry}>{t("retry")}</button>
+        </div>
+      )}
+      {!data && result.loading && <State loading />}
+      {data?.truncated && <p role="status">{t("searchTruncated")}</p>}
+      {data?.results.length === 0 && !data.truncated && <State empty />}
+      {data && (
+        <>
+          <div className="search-results">
+            {data.results.map((row, i) => (
+              <div
+                className="search-result"
+                key={[
+                  row.type,
+                  row.chainId,
+                  row.protocolAddress,
+                  row.hash,
+                  i,
+                ].join(":")}
+              >
+                <span>
+                  {t(searchTypeLabels[row.type as SearchType] ?? "unknown")}
+                </span>
+                <Address
+                  value={
+                    row.hash ?? objectIdentity(collectionFor(row.type), row)
+                  }
+                  data={row}
+                  internalHref={objectHref(
+                    collectionFor(row.type),
+                    row,
+                    row.hash ?? objectIdentity(collectionFor(row.type), row),
+                  )}
+                />
+                <Network data={row} />
+                <span className="muted mono" title={row.protocolAddress}>
+                  {row.protocolAddress
+                    ? row.protocolAddress.slice(0, 10) +
+                      "…" +
+                      row.protocolAddress.slice(-8)
+                    : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+          <PageControls
+            {...result}
+            total={data.total}
+            hasNext={!!data.nextCursor}
+            t={t}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+function Search() {
+  const { t } = useContext(Context);
   const [query, setQuery] = useState("");
+  const [type, setType] = useState<SearchType>("all");
   const [error, setError] = useState<Key>();
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<RecordData[] | null>(null);
-  const [searchType, setSearchType] = useState<SearchType>("all");
-  const [truncated, setTruncated] = useState(false);
-  const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
+  const [submitted, setSubmitted] = useState<{
+    query: string;
+    type: SearchType;
+    id: number;
+  }>();
   return (
     <section className="search-area">
       <SearchForm
         query={query}
-        type={searchType}
-        loading={loading}
+        type={type}
+        loading={false}
         t={t}
         onQuery={(value) => {
           setQuery(value);
-          setResults(null);
           setError(undefined);
-          setTruncated(false);
+          setSubmitted(undefined);
         }}
         onType={(value) => {
-          setSearchType(value);
-          setResults(null);
+          setType(value);
           setError(undefined);
-          setTruncated(false);
+          setSubmitted(undefined);
         }}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (loading) return;
-          const invalid = validateTypedSearch(query, searchType);
+        onSubmit={(event) => {
+          event.preventDefault();
+          const invalid = validateTypedSearch(query, type);
           setError(invalid ?? undefined);
-          if (invalid) return;
-          setLoading(true);
-          setResults(null);
-          setTruncated(false);
-          controller.current?.abort();
-          const abort = new AbortController();
-          controller.current = abort;
-          try {
-            const data = await searchPublic(query, searchType, abort.signal);
-            if (abort.signal.aborted) return;
-            setResults(data.results);
-            setTruncated(data.truncated === true);
-            if (data.results.length === 1 && !data.truncated) {
-              const r = data.results[0];
-              nav(
-                objectHref(
-                  collectionFor(r.type),
-                  r,
-                  r.hash ?? objectIdentity(collectionFor(r.type), r),
-                ),
-              );
-            }
-          } catch {
-            if (!abort.signal.aborted) setError("unavailable");
-          } finally {
-            if (!abort.signal.aborted) setLoading(false);
-          }
+          if (!invalid)
+            setSubmitted({ query: query.trim(), type, id: Date.now() });
         }}
       />
       <p className="muted">{t("searchPrivacy")}</p>
       {error && <p role="alert">{t(error)}</p>}
-      {loading && <State loading />}
-      {truncated && (
-        <p className="pagination-message" role="status">
-          {t("searchTruncated")}
-        </p>
-      )}
-      {results?.length === 0 && !truncated && <State empty />}
-      {results && (results.length > 1 || (truncated && results.length > 0)) && (
-        <div className="card">
-          {results.map((r, i) => (
-            <p key={i}>
-              <Link
-                to={objectHref(
-                  collectionFor(r.type),
-                  r,
-                  r.hash ?? objectIdentity(collectionFor(r.type), r),
-                )}
-              >
-                {t(searchTypeLabels[r.type as SearchType] ?? "unknown")}:{" "}
-                {r.hash ?? objectIdentity(collectionFor(r.type), r)}
-              </Link>
-              <Network data={r} />
-            </p>
-          ))}
-        </div>
+      {submitted && (
+        <SearchResults
+          key={submitted.id}
+          query={submitted.query}
+          type={submitted.type}
+        />
       )}
     </section>
   );
@@ -698,23 +757,40 @@ function GrantDetail({id}: {id: string}) {
 function Detail({ type, id }: { type: string; id: string }) {
   const { t, metadata } = useContext(Context);
   const location = useLocation();
-  const result = useData<RecordData>(
+  const result = useCursorPagination<RecordData>(
     "/" + type + "/" + encodeURIComponent(id) + location.search,
   );
   const data = result.data;
   const operations = data?.indexAnomaly
     ? []
     : (data?.operations ?? data?.activities?.items ?? (data ? [data] : []));
+  const rows = data ? recordRows(data) : undefined;
   const aggregate = type === "transactions" && operations.length > 1;
   const showRecognition = !aggregate && showsSourceRecognition(type, data);
   return (
     <>
       <p>
-        <Link to={type === "credit-states" ? "/grants" : "/" + type}>{t(type === "credit-states" ? "grants" : type as Key)}</Link> /
+        <Link
+          to={
+            type === "addresses"
+              ? "/"
+              : type === "credit-states"
+                ? "/grants"
+                : "/" + type
+          }
+        >
+          {t(type === "credit-states" ? "grants" : (type as Key))}
+        </Link>{" "}
+        /
       </p>
       <h1>{t(type as Key)}</h1>
-              <ObjectDescription type={type}/>
-      {aggregate && <p className="muted">{t("aggregate")} · {t("operationCount").replace("{count}",String(operations.length))}</p>}
+      <ObjectDescription type={type} />
+      {aggregate && (
+        <p className="muted">
+          {t("aggregate")} ·{" "}
+          {t("operationCount").replace("{count}", String(operations.length))}
+        </p>
+      )}
       <div className="detail-hash">
         <Address
           value={id}
@@ -722,13 +798,93 @@ function Detail({ type, id }: { type: string; id: string }) {
           data={operations[0] ?? data}
         />
       </div>
-      {result.loading || result.error ? (
+      {!data ? (
         <section className="card">
           <State {...result} />
         </section>
       ) : (
-        <div className={showRecognition && type !== "transactions" ? "detail-grid" : "detail-grid detail-grid-single"}>
+        <div
+          className={
+            showRecognition && type !== "transactions"
+              ? "detail-grid"
+              : "detail-grid detail-grid-single"
+          }
+          aria-busy={result.loading}
+        >
           <div>
+            {result.notice && (
+              <p role="status">
+                {t(
+                  result.notice === "updated"
+                    ? "paginationUpdated"
+                    : "paginationRestarted",
+                )}
+              </p>
+            )}
+            {result.error && (
+              <div role="alert">
+                <p>{t("unavailable")}</p>
+                <button onClick={result.retry}>{t("retry")}</button>
+              </div>
+            )}
+            {rows && (
+              <section className="card">
+                <h2>
+                  {t(
+                    type === "addresses"
+                      ? "addressActivity"
+                      : "recordOccurrences",
+                  )}
+                </h2>
+                {type === "addresses" && (
+                  <p className="muted">{t("addressScopeHint")}</p>
+                )}
+                {rows.length === 0 ? (
+                  <State empty />
+                ) : (
+                  <RecordTable
+                    rows={rows}
+                    t={t}
+                    network={(row) => <Network data={row} />}
+                    reference={(row) => {
+                      const collection =
+                        type === "addresses" ? "transactions" : type;
+                      const value =
+                        type === "addresses"
+                          ? (row.txHash ?? row.transactionHash)
+                          : objectIdentity(collection, row);
+                      const tx = row.txHash ?? row.transactionHash;
+                      return (
+                        <>
+                          <Address
+                            value={value || id}
+                            data={row}
+                            internalHref={
+                              value
+                                ? objectHref(collection, row, value)
+                                : undefined
+                            }
+                          />
+                          {type !== "addresses" && tx && (
+                            <div>
+                              <Link to={objectHref("transactions", row, tx)}>
+                                {t("sourceTransaction")}
+                              </Link>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }}
+                  />
+                )}
+                <PageControls
+                  {...result}
+                  total={data.total ?? data.activities?.total}
+                  hasNext={!!data.nextCursor}
+                  t={t}
+                />
+              </section>
+            )}
             {data?.indexAnomaly && (
               <section className="card">
                 <State
@@ -737,30 +893,57 @@ function Detail({ type, id }: { type: string; id: string }) {
                 />
               </section>
             )}
-            {type === "transactions" && <TransactionExecutionPanel operations={operations} t={t}
-              address={(value, kind) => <Address value={value} kind={kind} data={operations[0]}/>}/>}
-            {operations.map((op: RecordData, i: number) => (
+            {type === "transactions" && (
+              <TransactionExecutionPanel
+                operations={operations}
+                t={t}
+                address={(value, kind) => (
+                  <Address value={value} kind={kind} data={operations[0]} />
+                )}
+              />
+            )}
+            {(type === "addresses" ||
+            data?.indexAnomaly ||
+            (rows && !data?.txHash && !data?.transactionHash && !data?.kind)
+              ? []
+              : operations
+            ).map((op: RecordData, i: number) => (
               <section className="card" key={i}>
                 <h2>
-                  {aggregate ? t("operationNumber").replace("{number}",String(BigInt(op.operationIndex ?? i)+1n)) + " · " + (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind) : t("publicInfo")}
+                  {aggregate
+                    ? t("operationNumber").replace(
+                        "{number}",
+                        String(BigInt(op.operationIndex ?? i) + 1n),
+                      ) +
+                      " · " +
+                      (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind)
+                    : t("publicInfo")}
                 </h2>
-                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={type !== "transactions" && !aggregate} />
-                {(aggregate || (type === "transactions" && showRecognition)) && <SourceRecognition data={aggregate ? op : data ?? op} t={t} status={value=><Status value={value}/>}/>}
-                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={type === "transactions" || aggregate} t={t}
-                  address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}
-                  amount={(value, token) => <Amount value={value} data={{...op, tokenAddress:token}}/>}
-                  href={(collection, value) => objectHref(collection,op,value)}/>}
-                {!isCreditOperation(op.kind) && (type === "transactions" || (Array.isArray(op.funding) && op.funding.length > 0) ||
-                  op.fundingEvidence ||
-                  op.routerFunding ||
-                  op.executionContext ||
-                  op.unsupportedReason) && (
-                  <FundingPanel
+                <PublicFields
+                  data={op}
+                  showSourceTransaction={type !== "transactions"}
+                  showNoteAmount={type === "notes"}
+                  showProtocol={type !== "transactions" && !aggregate}
+                />
+                {(aggregate ||
+                  (type === "transactions" && showRecognition)) && (
+                  <SourceRecognition
+                    data={aggregate ? op : (data ?? op)}
+                    t={t}
+                    status={(value) => <Status value={value} />}
+                  />
+                )}
+                {isCreditOperation(op.kind) && (
+                  <CreditOperationPanel
                     operation={op}
                     hideTransaction={type === "transactions" || aggregate}
                     t={t}
                     address={(value, kind) => (
-                      <Address value={value} kind={kind} data={op} />
+                      <Address
+                        value={value}
+                        kind={kind ?? "address"}
+                        data={op}
+                      />
                     )}
                     amount={(value, token) => (
                       <Amount
@@ -768,99 +951,205 @@ function Detail({ type, id }: { type: string; id: string }) {
                         data={{ ...op, tokenAddress: token }}
                       />
                     )}
+                    href={(collection, value) =>
+                      objectHref(collection, op, value)
+                    }
                   />
                 )}
-                {type === "transactions" && <OperationNoteInputs operation={op} t={t}
-                  reference={value => <Address value={value} data={op} internalHref={objectHref("nullifiers",op,value)+"&namespace=note"}/>}/>}
+                {!isCreditOperation(op.kind) &&
+                  (type === "transactions" ||
+                    (Array.isArray(op.funding) && op.funding.length > 0) ||
+                    op.fundingEvidence ||
+                    op.routerFunding ||
+                    op.executionContext ||
+                    op.unsupportedReason) && (
+                    <FundingPanel
+                      operation={op}
+                      hideTransaction={type === "transactions" || aggregate}
+                      t={t}
+                      address={(value, kind) => (
+                        <Address value={value} kind={kind} data={op} />
+                      )}
+                      amount={(value, token) => (
+                        <Amount
+                          value={value}
+                          data={{ ...op, tokenAddress: token }}
+                        />
+                      )}
+                    />
+                  )}
+                {type === "transactions" && (
+                  <OperationNoteInputs
+                    operation={op}
+                    t={t}
+                    reference={(value) => (
+                      <Address
+                        value={value}
+                        data={op}
+                        internalHref={
+                          objectHref("nullifiers", op, value) +
+                          "&namespace=note"
+                        }
+                      />
+                    )}
+                  />
+                )}
                 {op.noteOutputs?.length > 0 && (
                   <>
-                    <h3>{t("noteOutputsCount").replace("{count}", String(op.noteOutputs.length))}</h3>
+                    <h3>
+                      {t("noteOutputsCount").replace(
+                        "{count}",
+                        String(op.noteOutputs.length),
+                      )}
+                    </h3>
                     <div className="table-wrap note-outputs-wrap">
                       <table className="note-outputs-table">
-                        <thead><tr>
-                          <th>{t("noteCommitmentLabel")}<TermHelp term="noteCommitmentLabel" label={t("noteCommitmentLabel")} t={t}/></th><th>{t("outputAmount")}</th>
-                          <th>{t("treeIdLabel")}<TermHelp term="treeIdLabel" label={t("treeIdLabel")} t={t}/></th><th>{t("leafIndexLabel")}<TermHelp term="leafIndexLabel" label={t("leafIndexLabel")} t={t}/></th>
-                        </tr></thead>
-                        <tbody>{op.noteOutputs.map((note: RecordData, j: number) => (
-                          <tr key={note.noteCommitment ?? j}>
-                            <td data-label={t("noteCommitmentLabel")}><Address value={note.noteCommitment} data={op} internalHref={objectHref("notes", op, note.noteCommitment)}/></td>
-                            <td data-label={t("outputAmount")}>{note.amount === undefined ? t("notPublic") : <Amount value={note.amount} data={op}/>}</td>
-                            <td data-label={t("treeIdLabel")}>{note.treeId == null ? "—" : <Link to={objectHref("trees", op, "protocol:" + note.treeId)}>{note.treeId}</Link>}</td>
-                            <td data-label={t("leafIndexLabel")}>{note.leafIndex ?? "—"}</td>
+                        <thead>
+                          <tr>
+                            <th>
+                              {t("noteCommitmentLabel")}
+                              <TermHelp
+                                term="noteCommitmentLabel"
+                                label={t("noteCommitmentLabel")}
+                                t={t}
+                              />
+                            </th>
+                            <th>{t("outputAmount")}</th>
+                            <th>
+                              {t("treeIdLabel")}
+                              <TermHelp
+                                term="treeIdLabel"
+                                label={t("treeIdLabel")}
+                                t={t}
+                              />
+                            </th>
+                            <th>
+                              {t("leafIndexLabel")}
+                              <TermHelp
+                                term="leafIndexLabel"
+                                label={t("leafIndexLabel")}
+                                t={t}
+                              />
+                            </th>
                           </tr>
-                        ))}</tbody>
+                        </thead>
+                        <tbody>
+                          {op.noteOutputs.map((note: RecordData, j: number) => (
+                            <tr key={note.noteCommitment ?? j}>
+                              <td data-label={t("noteCommitmentLabel")}>
+                                <Address
+                                  value={note.noteCommitment}
+                                  data={op}
+                                  internalHref={objectHref(
+                                    "notes",
+                                    op,
+                                    note.noteCommitment,
+                                  )}
+                                />
+                              </td>
+                              <td data-label={t("outputAmount")}>
+                                {note.amount === undefined ? (
+                                  t("notPublic")
+                                ) : (
+                                  <Amount value={note.amount} data={op} />
+                                )}
+                              </td>
+                              <td data-label={t("treeIdLabel")}>
+                                {note.treeId == null ? (
+                                  "—"
+                                ) : (
+                                  <Link
+                                    to={objectHref(
+                                      "trees",
+                                      op,
+                                      "protocol:" + note.treeId,
+                                    )}
+                                  >
+                                    {note.treeId}
+                                  </Link>
+                                )}
+                              </td>
+                              <td data-label={t("leafIndexLabel")}>
+                                {note.leafIndex ?? "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
                       </table>
                     </div>
                   </>
                 )}
-                {!(type === "transactions" && isCreditOperation(op.kind)) && (op.draws ?? op.drawRecords)?.length > 0 && (
-                  <>
-                    <h3>{t("drawRecords")}</h3>
-                    {(op.draws ?? op.drawRecords).map(
-                      (draw: RecordData, j: number) => (
-                        <div className="output" key={j}>
-                          <Link
-                            to={objectHref(
-                              "transactions",
-                              draw,
-                              draw.txHash ?? draw.transactionHash,
+                {!(type === "transactions" && isCreditOperation(op.kind)) &&
+                  (op.draws ?? op.drawRecords)?.length > 0 && (
+                    <>
+                      <h3>{t("drawRecords")}</h3>
+                      {(op.draws ?? op.drawRecords).map(
+                        (draw: RecordData, j: number) => (
+                          <div className="output" key={j}>
+                            <Link
+                              to={objectHref(
+                                "transactions",
+                                draw,
+                                draw.txHash ?? draw.transactionHash,
+                              )}
+                            >
+                              {draw.txHash ?? draw.transactionHash}
+                            </Link>
+                            {draw.noteCommitment && (
+                              <p>
+                                <Link
+                                  to={objectHref(
+                                    "notes",
+                                    draw,
+                                    draw.noteCommitment,
+                                  )}
+                                >
+                                  {draw.noteCommitment}
+                                </Link>
+                              </p>
                             )}
-                          >
-                            {draw.txHash ?? draw.transactionHash}
-                          </Link>
-                          {draw.noteCommitment && (
-                            <p>
-                              <Link
-                                to={objectHref(
-                                  "notes",
-                                  draw,
-                                  draw.noteCommitment,
-                                )}
-                              >
-                                {draw.noteCommitment}
-                              </Link>
-                            </p>
-                          )}
-                          <p>{fullTime(draw.timestamp)}</p>
-                        </div>
-                      ),
-                    )}
-                  </>
-                )}
-                {!isCreditOperation(op.kind) && op.creditOutputs?.map((credit: RecordData, j: number) => (
-                  <p key={j}>
-                    <Link
-                      to={objectHref(
-                        "credit-states",
-                        op,
-                        credit.creditCommitment ?? credit.commitment,
+                            <p>{fullTime(draw.timestamp)}</p>
+                          </div>
+                        ),
                       )}
-                    >
-                      {credit.creditCommitment ?? credit.commitment}
-                    </Link>
-                  </p>
-                ))}
-                {!isCreditOperation(op.kind) && op.grantRefs?.map((grant: RecordData, j: number) => (
-                  <p key={j}>
-                    <Link
-                      to={
-                        "/grants/" +
-                        encodeURIComponent(
-                          [
-                            op.chainId,
-                            op.protocolAddress,
-                            grant.tokenAddress ?? op.tokenAddress,
-                            grant.payer,
-                            grant.grantId,
-                          ].join(":"),
-                        ) +
-                        scope(op)
-                      }
-                    >
-                      {t("grants")} · {grant.payer} / {grant.grantId}
-                    </Link>
-                  </p>
-                ))}
+                    </>
+                  )}
+                {!isCreditOperation(op.kind) &&
+                  op.creditOutputs?.map((credit: RecordData, j: number) => (
+                    <p key={j}>
+                      <Link
+                        to={objectHref(
+                          "credit-states",
+                          op,
+                          credit.creditCommitment ?? credit.commitment,
+                        )}
+                      >
+                        {credit.creditCommitment ?? credit.commitment}
+                      </Link>
+                    </p>
+                  ))}
+                {!isCreditOperation(op.kind) &&
+                  op.grantRefs?.map((grant: RecordData, j: number) => (
+                    <p key={j}>
+                      <Link
+                        to={
+                          "/grants/" +
+                          encodeURIComponent(
+                            [
+                              op.chainId,
+                              op.protocolAddress,
+                              grant.tokenAddress ?? op.tokenAddress,
+                              grant.payer,
+                              grant.grantId,
+                            ].join(":"),
+                          ) +
+                          scope(op)
+                        }
+                      >
+                        {t("grants")} · {grant.payer} / {grant.grantId}
+                      </Link>
+                    </p>
+                  ))}
               </section>
             ))}
             <section className="card">
@@ -870,9 +1159,16 @@ function Detail({ type, id }: { type: string; id: string }) {
               </details>
             </section>
           </div>
-          {showRecognition && type !== "transactions" && <aside>
-            <SourceRecognition data={data ?? {}} t={t} status={value=><Status value={value}/>} aside/>
-          </aside>}
+          {showRecognition && type !== "transactions" && (
+            <aside>
+              <SourceRecognition
+                data={data ?? {}}
+                t={t}
+                status={(value) => <Status value={value} />}
+                aside
+              />
+            </aside>
+          )}
         </div>
       )}
     </>

@@ -587,14 +587,14 @@ func (e *Explorer) object(ctx context.Context, route string, q query, hash strin
 	}
 	global := page
 	if route == "notes" {
-		globalQuery := query{limit: 200, hash: string(f)}
+		globalQuery := query{limit: 1, hash: string(f)}
 		global, err = e.list(ctx, route, globalQuery)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if global.Total != "1" {
-		return map[string]any{"commitment": f, "domain": route, "occurrences": global.Items, "total": global.Total, "nextCursor": global.NextCursor, "snapshot": global.Snapshot, "indexAnomaly": true, "recognition": []any{}}, nil
+		return map[string]any{"commitment": f, "domain": route, "occurrences": page.Items, "total": page.Total, "nextCursor": page.NextCursor, "snapshot": page.Snapshot, "indexAnomaly": true, "recognition": []any{}}, nil
 	}
 	out := copyMap(page.Items[0])
 	out["occurrences"] = page.Items

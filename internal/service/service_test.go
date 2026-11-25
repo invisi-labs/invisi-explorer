@@ -31,7 +31,7 @@ func TestHTTPBoundaryAndStaticFonts(t *testing.T) {
 	for _, tc := range []struct {
 		method, path, body string
 		status             int
-	}{{"GET", "/fonts/font.woff2", "", 200}, {"GET", "/.env", "", 404}, {"GET", "/api/v1/no-such-route", "", 404}, {"GET", "/api/anything", "", 404}, {"GET", "/notes/hash", "", 200}, {"GET", "/api/v1/search", "", 405}, {"POST", "/api/v1/search?a=b", `{"query":"0x0000000000000000000000000000000000000001"}`, 400}, {"POST", "/api/v1/search", `{"query":"x","query":"y"}`, 400}, {"POST", "/api/v1/search", `{"query":"x"} {}`, 400}, {"GET", "/api/v1/overview", "", 503}} {
+	}{{"GET", "/fonts/font.woff2", "", 200}, {"GET", "/.env", "", 404}, {"GET", "/api/v1/no-such-route", "", 404}, {"GET", "/api/anything", "", 404}, {"GET", "/notes/hash", "", 200}, {"GET", "/api/v1/search", "", 405}, {"POST", "/api/v1/search?a=b", `{"query":"0x0000000000000000000000000000000000000001"}`, 400}, {"POST", "/api/v1/search", `{"query":"x","query":"y"}`, 400}, {"POST", "/api/v1/search", `{"query":"x"} {}`, 400}, {"POST", "/api/v1/search", strings.Repeat(" ", 1100) + `{"query":"0x0000000000000000000000000000000000000001"}`, 503}, {"GET", "/api/v1/overview", "", 503}} {
 		r := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()

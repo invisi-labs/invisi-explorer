@@ -148,7 +148,7 @@ func (e *Explorer) address(ctx context.Context, q query, address string) (any, e
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"address": q.address, "activities": page, "snapshot": page.Snapshot, "roleBoundary": "public_payer_transaction_sender_funding_participant_protocol_token_feeRecipient_only"}, nil
+	return map[string]any{"address": q.address, "activities": page, "nextCursor": page.NextCursor, "total": page.Total, "snapshot": page.Snapshot, "roleBoundary": "public_payer_transaction_sender_funding_participant_protocol_token_feeRecipient_only"}, nil
 }
 func (e *Explorer) addressCondition(address string) (string, []any) {
 	fee := e.extract("o.payload", "feeRecipient")
@@ -166,11 +166,16 @@ func (e *Explorer) addressCondition(address string) (string, []any) {
 	return "(LOWER(o.protocol_address)=? OR LOWER(" + token + ")=? OR LOWER(" + fee + ")=? OR " + funding + " OR LOWER(" + player + ")=? OR LOWER(" + sender + ")=? OR " + flows + ")", []any{address, address, address, address, address, address, address, address, address}
 }
 func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawMessage) (any, error) {
-	if len(values) != 0 || len(body) == 0 || len(body) > 1024 {
+	if len(values) != 0 || len(body) == 0 || len(body) > 8192 {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	var request struct{ Query, Type string }
+	var request struct {
+		Query, Type, Cursor string
+		Limit               int
+	}
+	request.Limit = 20
 	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
 	token, err := decoder.Token()
 	if err != nil || token != json.Delim('{') {
 		return nil, publicError("INVALID_PARAMS")
@@ -190,6 +195,18 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 		if decoder.Decode(&rawValue) != nil {
 			return nil, publicError("INVALID_PARAMS")
 		}
+		if name == "limit" {
+			number, ok := rawValue.(json.Number)
+			if !ok {
+				return nil, publicError("INVALID_PARAMS")
+			}
+			n, err := strconv.Atoi(string(number))
+			if err != nil || n < 1 || n > 200 || strconv.Itoa(n) != string(number) {
+				return nil, publicError("INVALID_PARAMS")
+			}
+			request.Limit = n
+			continue
+		}
 		value, ok := rawValue.(string)
 		if !ok {
 			return nil, publicError("INVALID_PARAMS")
@@ -199,6 +216,8 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 			request.Query = value
 		case "type":
 			request.Type = value
+		case "cursor":
+			request.Cursor = value
 		default:
 			return nil, publicError("INVALID_PARAMS")
 		}
@@ -218,114 +237,24 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 	if _, err = decoder.Token(); err != io.EOF {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	query := strings.TrimSpace(request.Query)
-	lower := strings.ToLower(query)
+	identifier := strings.TrimSpace(request.Query)
+	lower := strings.ToLower(identifier)
 	for _, prefix := range []string{"0i", "ipn", "viewkey", "view key", "privatekey", "private key", "secretkey", "secret key", "seed:", "mnemonic:"} {
 		if strings.HasPrefix(lower, prefix) {
 			return nil, publicError("SECRET_MATERIAL")
 		}
 	}
-	if !hashHex(query, 32) && !hashHex(query, 20) {
+	if !hashHex(identifier, 32) && !hashHex(identifier, 20) {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	if (request.Type == "address" && !hashHex(query, 20)) || (request.Type != "" && request.Type != "all" && request.Type != "address" && !hashHex(query, 32)) {
+	if (request.Type == "address" && !hashHex(identifier, 20)) || (request.Type != "" && request.Type != "all" && request.Type != "address" && !hashHex(identifier, 32)) {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	query = lower
-	q := queryOptions()
-	snapshot, err := e.snapshot(ctx, q)
-	if err != nil {
-		return nil, err
+	kind := request.Type
+	if kind == "" {
+		kind = "all"
 	}
-	where, args := snapshotWhere(snapshot)
-	where = "o.canonical=1 AND " + where
-	results := []any{}
-	if hashHex(query, 20) {
-		condition, extra := e.addressCondition(query)
-		params := append(append([]any(nil), args...), extra...)
-		rows, err := e.db.QueryContext(ctx, e.sql("SELECT o.chain_id,o.protocol_address FROM operations o WHERE "+where+" AND "+condition+" GROUP BY o.chain_id,o.protocol_address LIMIT 201"), params...)
-		if err != nil {
-			return nil, publicError("UNAVAILABLE")
-		}
-		for rows.Next() {
-			var chain, protocol string
-			if rows.Scan(&chain, &protocol) != nil {
-				rows.Close()
-				return nil, publicError("UNAVAILABLE")
-			}
-			results = append(results, map[string]any{"type": "address", "hash": query, "chainId": chain, "protocolAddress": protocol})
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, publicError("UNAVAILABLE")
-		}
-	} else {
-		definitions := []struct{ kind, from, column string }{{"transaction", "operations o", "o.tx_hash"}, {"note", "public_notes n JOIN operations o ON o.id=n.operation_id", "n.commitment"}, {"creditState", "public_credit_states n JOIN operations o ON o.id=n.operation_id", "n.commitment"}, {"nullifier", "public_nullifiers n JOIN operations o ON o.id=n.operation_id", "n.nullifier"}}
-		for _, d := range definitions {
-			if request.Type != "" && request.Type != "all" && request.Type != d.kind {
-				continue
-			}
-			params := append(append([]any(nil), args...), query)
-			extraWhere := ""
-			if d.kind == "note" || d.kind == "creditState" {
-				extraWhere = " AND " + e.successSQL()
-			}
-			rows, err := e.db.QueryContext(ctx, e.sql("SELECT o.chain_id,o.protocol_address,COUNT(*) FROM "+d.from+" WHERE "+where+" AND LOWER("+d.column+")=?"+extraWhere+" GROUP BY o.chain_id,o.protocol_address LIMIT 201"), params...)
-			if err != nil {
-				return nil, publicError("UNAVAILABLE")
-			}
-			for rows.Next() {
-				var chain, protocol string
-				var count int64
-				if rows.Scan(&chain, &protocol, &count) != nil {
-					rows.Close()
-					return nil, publicError("UNAVAILABLE")
-				}
-				results = append(results, map[string]any{"type": d.kind, "hash": query, "chainId": chain, "protocolAddress": protocol, "occurrenceCount": strconv.FormatInt(count, 10)})
-			}
-			err = rows.Err()
-			rows.Close()
-			if err != nil {
-				return nil, publicError("UNAVAILABLE")
-			}
-		}
-		if request.Type == "" || request.Type == "all" || request.Type == "root" {
-			rootWhere, rootArgs := e.scopeWhere("c.scope")
-			rootArgs = append(rootArgs, query)
-			rootRows, rootErr := e.db.QueryContext(ctx, e.sql("SELECT c.payload,c.generation,s.generation FROM checkpoints c JOIN scopes s ON s.id=c.scope WHERE c.published=1 AND "+rootWhere+" AND LOWER("+e.extract("c.payload", "root")+")=? ORDER BY c.scope,c.generation DESC,c.sequence DESC LIMIT 201"), rootArgs...)
-			if rootErr != nil {
-				return nil, publicError("UNAVAILABLE")
-			}
-			for rootRows.Next() {
-				var payload, generation, current string
-				if rootRows.Scan(&payload, &generation, &current) != nil {
-					rootRows.Close()
-					return nil, publicError("UNAVAILABLE")
-				}
-				var cert p.Certificate
-				if json.Unmarshal([]byte(payload), &cert) != nil {
-					rootRows.Close()
-					return nil, publicError("UNAVAILABLE")
-				}
-				id := cert.ChainID + ":" + strings.ToLower(cert.ProtocolAddress) + ":" + cert.ChainGeneration + ":" + cert.RootSequence
-				results = append(results, map[string]any{"type": "root", "hash": id, "rootId": id, "root": cert.Root, "chainId": cert.ChainID, "protocolAddress": cert.ProtocolAddress, "currentGeneration": generation == current})
-			}
-			rootErr = rootRows.Err()
-			rootRows.Close()
-			if rootErr != nil {
-				return nil, publicError("UNAVAILABLE")
-			}
-		}
-
-	}
-	truncated := len(results) > 200
-	if truncated {
-		results = results[:200]
-	}
-	if err = e.validateSnapshot(ctx, snapshot); err != nil {
-		return nil, err
-	}
-	return map[string]any{"results": results, "snapshot": snapshot, "searchBoundary": "public_identifiers_only", "truncated": truncated}, nil
+	return e.searchPage(ctx, query{limit: request.Limit, cursor: request.Cursor, hash: lower, namespace: kind})
 }
+
 func queryOptions() query { return query{limit: 20} }

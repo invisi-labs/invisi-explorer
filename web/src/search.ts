@@ -44,11 +44,17 @@ export function validateTypedSearch(
     ? null
     : "invalid";
 }
-type SearchResponse = { results: Record<string, any>[]; truncated?: boolean };
+export type SearchResponse = {
+  results: Record<string, any>[];
+  truncated?: boolean;
+  nextCursor?: string;
+  total?: string;
+};
 export async function searchPublic(
   query: string,
   type: SearchType,
   signal?: AbortSignal,
+  page?: { cursor?: string; limit?: number },
 ): Promise<SearchResponse> {
   const invalid = validateTypedSearch(query, type);
   if (invalid)
@@ -61,11 +67,18 @@ export async function searchPublic(
     data = await request<SearchResponse>("/search", signal, {
       query: query.trim(),
       ...(type === "all" ? {} : { type }),
+      ...(page
+        ? {
+            limit: page.limit ?? 20,
+            ...(page.cursor ? { cursor: page.cursor } : {}),
+          }
+        : {}),
     });
   } catch (error) {
     const e = error as ApiError;
     if (
-      type === "all" ||
+      (!page && type === "all") ||
+      !!page?.cursor ||
       e.status !== 400 ||
       e.code !== "INVALID_PARAMS" ||
       signal?.aborted

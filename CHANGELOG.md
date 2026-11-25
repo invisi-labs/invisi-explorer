@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Paginate address activities and object/root/tree occurrence records. Continue public search beyond 200 matches using authenticated snapshot cursors, retain rows on transient failures, and recover after reorg/generation changes.
+
 - Add a responsive search-type selector for transactions, addresses, Note and credit-state commitments, Nullifiers and Merkle roots, with type-scoped backend queries and updated placeholders.
 
 - Present Provenance availability as the result of the last verification request, avoiding false expiry warnings for idle services. Keep Explorer observation freshness separate.

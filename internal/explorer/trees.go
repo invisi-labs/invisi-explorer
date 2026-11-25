@@ -271,7 +271,7 @@ func (e *Explorer) trees(ctx context.Context, q query, id string) (any, error) {
 		if count == 1 {
 			return page.Items[0], nil
 		}
-		return map[string]any{"occurrences": page.Items, "total": page.Total, "snapshot": s}, nil
+		return map[string]any{"occurrences": page.Items, "total": page.Total, "nextCursor": page.NextCursor, "snapshot": s}, nil
 	}
 	return page, nil
 }

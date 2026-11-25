@@ -10,7 +10,7 @@ vi.mock("react", async (original) => {
   return actual.useState(value && typeof value === "object" && value.loading === true && Object.keys(value).length===1 ? {data:fixture.data,loading:false} : value);
  }};
 });
-vi.mock("./useCursorPagination", () => ({useCursorPagination:()=>({data:{items:[fixture.data],total:1},loading:false})}));
+vi.mock("./useCursorPagination", () => ({useCursorPagination:(path:string)=>({data:path.split("?")[0].split("/").filter(Boolean).length>1?fixture.data:{items:[fixture.data],total:1},loading:false,page:1})}));
 vi.mock("react-router-dom", async (original) => {
  const actual=await original<typeof import("react-router-dom")>();
  return {...actual,BrowserRouter:({children}:{children:ReactNode})=><actual.MemoryRouter initialEntries={[fixture.path]}>{children}</actual.MemoryRouter>};
@@ -64,4 +64,23 @@ it("does not repeat transaction-level Core protocol details in operation fields"
  expect(renderToStaticMarkup(application)).not.toMatch(/<dt>Protocol(?:<|$)/);
  fixture.path="/notes/"+'0x'+'3'.repeat(64);
  expect(renderToStaticMarkup(application)).toMatch(/<dt>Protocol(?:<|$)/);
+});
+it("renders address activity as a paged table rather than expanded operation cards",()=>{
+ fixture.path='/addresses/0x'+'4'.repeat(40)+'?chainId=97';
+ fixture.data={address:'0x'+'4'.repeat(40),total:'205',nextCursor:'second',activities:{items:[{...operation,txHash:operation.transactionHash}],total:'205',nextCursor:'second'}};
+ const html=renderToStaticMarkup(application);
+ expect(html).toContain('<h2>Address activity</h2>');
+ expect(html).toContain('205 records · Page 1');
+ expect(html).toContain('/transactions/'+operation.transactionHash+'?chainId=97');
+ expect(html).not.toContain('class="funding-panel"');
+ expect(html).toContain('<button>Next');
+});
+it("renders all paged object occurrences even when the object has an index anomaly",()=>{
+ fixture.path='/notes/0x'+'3'.repeat(64);
+ fixture.data={commitment:'0x'+'3'.repeat(64),indexAnomaly:true,total:'25',nextCursor:'second',occurrences:[{...operation,noteCommitment:'0x'+'3'.repeat(64)}]};
+ const html=renderToStaticMarkup(application);
+ expect(html).toContain('<h2>Occurrence records</h2>');
+ expect(html).toContain('25 records · Page 1');
+ expect(html).toContain('Source transaction</a>');
+ expect(html).not.toContain('class="funding-panel"');
 });

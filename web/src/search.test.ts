@@ -68,3 +68,29 @@ it("does not send known private material or retry unavailable services", async (
   });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it("posts cursor in the body and never falls back to page one on a continuation error", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ results: [], nextCursor: "second", total: "205" }),
+    })
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { code: "INVALID_PARAMS" } }),
+    });
+  vi.stubGlobal("fetch", fetcher);
+  const data = await searchPublic(hash, "root", undefined, { limit: 20 });
+  expect(data.nextCursor).toBe("second");
+  await expect(
+    searchPublic(hash, "root", undefined, { cursor: "second", limit: 20 }),
+  ).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({
+    query: hash,
+    type: "root",
+    limit: 20,
+    cursor: "second",
+  });
+});

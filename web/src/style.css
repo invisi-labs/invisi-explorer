@@ -615,3 +615,5 @@ footer.site-footer { display: block; max-width: none; margin: 48px 0 0; padding:
  .search input { flex:1 1 0; min-width:0; }
  .search .primary { width:auto; flex:none; }
 }
+.search-results{display:grid;gap:12px}.search-result{display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:8px 16px;padding:14px;border-radius:12px;background:var(--surface-subtle)}.search-result>.mono{grid-column:2/-1}.search-result .address{min-width:0;overflow-wrap:anywhere}
+@media(max-width:640px){.search-result{grid-template-columns:minmax(0,1fr)}.search-result>.mono{grid-column:auto}}

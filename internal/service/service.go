@@ -290,8 +290,8 @@ func Handler(e *explorer.Explorer, webDir string) http.Handler {
 					return
 				}
 				var err error
-				body, err = io.ReadAll(io.LimitReader(r.Body, 1025))
-				if err != nil || len(body) > 1024 {
+				body, err = io.ReadAll(io.LimitReader(r.Body, 8193))
+				if err != nil || len(body) > 8192 {
 					writeError(w, &api.Error{Code: "INVALID_PARAMS"})
 					return
 				}
