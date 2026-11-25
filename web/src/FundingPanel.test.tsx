@@ -108,7 +108,7 @@ const privateOperation = {
 const renderFunding=(op:Record<string,unknown>,hideTransaction=false)=>renderToStaticMarkup(<FundingPanel operation={op} hideTransaction={hideTransaction} t={k=>dictionaries.en[k]} address={v=><code>{v}</code>} amount={v=><span>{v}</span>}/>);
 it("explains private Note funding without implying missing public trace or naming owners",()=>{
  const html=renderFunding(privateOperation);
- expect(html).toContain("Uses private Note inputs");
+ expect(html).toContain(dictionaries.en.fundingPrivateInputs);
  expect(html).not.toContain(dictionaries.en.fundingUnavailable);
  expect(html).not.toContain(dictionaries.en.fundingSourceUnknown);
  expect(html).toContain(dictionaries.en.fundingNoDeposit);
@@ -118,7 +118,7 @@ it("keeps missing-trace warnings for public funding and incomplete or unsupporte
  for(const patch of [{funding:[{payer:player,tokenAddress:core,amount:"1"}]},{funding:undefined},{unsupportedReason:"UNSUPPORTED"},{noteNullifiers:[]},{noteOutputs:[{amount:"7"}]},{noteOutputs:[{}]},{success:false},{canonical:false}]){
   const html=renderFunding({...privateOperation,...patch});
   expect(html).toContain(dictionaries.en.fundingUnavailable);
-  expect(html).not.toContain("Uses private Note inputs");
+  expect(html).not.toContain(dictionaries.en.fundingPrivateInputs);
  }
 });
 it("keeps operation funding but omits outer transaction fields when grouped",()=>{

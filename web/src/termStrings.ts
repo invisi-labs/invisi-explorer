@@ -10,9 +10,9 @@ export const termStrings = {
     "A public commitment identifying a Note on-chain. It does not directly reveal its owner or private amount.",
   ],
   termHelp_noteInputsCount: [
-    "私有 Note 可作为交易输入。页面可展示公开的 nullifier，但不能据此确定原 Note 的所有者和金额。",
-    "私有 Note 可作為交易輸入。頁面可顯示公開 nullifier，但無法據此確認原 Note 的所有者和金額。",
-    "Private Notes can be spent as transaction inputs. Public nullifiers do not establish the original Note owners or amounts.",
+    "此列表展示花费 Note 时公开的 Nullifier（已核销标识），用于防止重复花费；它不是原 Note 承诺，也不公开所有者或私密金额。",
+    "此清單顯示花費 Note 時公開的 Nullifier（已核銷標識），用於防止重複花費；並非原 Note 承諾，也不公開所有者或私密金額。",
+    "This list contains public nullifiers emitted when Notes are spent to prevent double spending. They are not the original Note commitments and do not reveal owners or private amounts.",
   ],
   termHelp_nullifier: [
     "花费私有 Note 时公开的防重复花费标记。它不直接揭示原 Note 或出资人身份。",

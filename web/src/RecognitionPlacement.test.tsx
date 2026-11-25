@@ -48,3 +48,13 @@ it("keeps aggregate recognition scoped to applicable internal operations",()=>{
  expect(html.match(/aria-label="Source recognition"/g)).toHaveLength(1);
  expect(html).not.toContain('<aside');
 });
+it("uses one transaction execution summary and consistent public-funding headings for single and aggregate transactions",()=>{
+ fixture.path="/transactions/"+operation.transactionHash;
+ for(const operations of [[operation],[operation,{...operation,operationIndex:"1"}]]) {
+  fixture.data={operations};
+  const html=renderToStaticMarkup(application);
+  expect(html.match(/<h2>Transaction execution<\/h2>/g)).toHaveLength(1);
+  expect(html.match(/<h3>Public funding<\/h3>/g)).toHaveLength(operations.length);
+  expect(html).not.toContain('Funding and execution');
+ }
+});

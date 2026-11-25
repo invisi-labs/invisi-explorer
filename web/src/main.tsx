@@ -717,7 +717,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                 />
               </section>
             )}
-            {aggregate && <TransactionExecutionPanel operations={operations} t={t}
+            {type === "transactions" && <TransactionExecutionPanel operations={operations} t={t}
               address={(value, kind) => <Address value={value} kind={kind} data={operations[0]}/>}/>}
             {operations.map((op: RecordData, i: number) => (
               <section className="card" key={i}>
@@ -726,7 +726,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                 </h2>
                 <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={!aggregate} />
                 {(aggregate || (type === "transactions" && showRecognition)) && <SourceRecognition data={aggregate ? op : data ?? op} t={t} status={value=><Status value={value}/>}/>}
-                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={aggregate} t={t}
+                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={type === "transactions" || aggregate} t={t}
                   address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}
                   amount={(value, token) => <Amount value={value} data={{...op, tokenAddress:token}}/>}
                   href={(collection, value) => objectHref(collection,op,value)}/>}
@@ -737,7 +737,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                   op.unsupportedReason) && (
                   <FundingPanel
                     operation={op}
-                    hideTransaction={aggregate}
+                    hideTransaction={type === "transactions" || aggregate}
                     t={t}
                     address={(value, kind) => (
                       <Address value={value} kind={kind} data={op} />

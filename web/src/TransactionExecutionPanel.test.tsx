@@ -32,7 +32,7 @@ it("uses bound observations when another member has no optional observation",()=
 it("lists only public consumed Note identifiers without disclosing local owner data",()=>{
  const n="0x"+"e".repeat(64);
  const html=renderToStaticMarkup(<OperationNoteInputs operation={{success:true,canonical:true,noteNullifiers:[n],owner:"Bob",amount:"SECRET_AMOUNT"}} t={k=>dictionaries.en[k]} reference={value=><a href={'/nullifiers/'+value+'?namespace=note'}>{value}</a>}/>);
- expect(html).toContain(n);expect(html).toContain("Private Note inputs (1)");
+ expect(html).toContain(n);expect(html).toContain("Input nullifiers (1)");
  expect(html).not.toContain("Bob");expect(html).not.toContain("SECRET_AMOUNT");
  const failed=renderToStaticMarkup(<OperationNoteInputs operation={{success:false,canonical:true,noteNullifiers:[n]}} t={k=>dictionaries.en[k]} reference={v=><span>{v}</span>}/>);
  expect(failed).not.toContain(n);
