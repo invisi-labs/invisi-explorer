@@ -60,31 +60,53 @@ func (s *Syncer) Recognition(ctx context.Context, c config.Chain, op model.Opera
 	if len(op.NoteOutputs) == 0 && (op.Kind == "createCredit" || op.Kind == "updateCredit" || op.Kind == "revokeCredit") {
 		return []any{map[string]any{"status": "not_applicable"}}, nil
 	}
-	var payload string
+	if c.ProvenanceURL == "" {
+		if c.ChainID != "" {
+			if err := s.Store.ConfigureRecognition(ctx, Scope(c), "", c.IssuerID); err != nil {
+				return nil, err
+			}
+		}
+		return unavailable(), nil
+	}
+	if err := s.Store.ConfigureRecognition(ctx, Scope(c), c.ProvenanceURL, c.IssuerID); err != nil {
+		return nil, err
+	}
+	var payload, generation string
 	var updated int64
-	if s.Store.DB.QueryRowContext(ctx, "SELECT payload,updated_at FROM remote_recognition WHERE operation_id=?", op.ID()).Scan(&payload, &updated) != nil || time.Now().Unix()-updated > 60 {
-		_, _ = s.Store.DB.ExecContext(ctx, "INSERT INTO recognition_requests VALUES(?,?) ON CONFLICT(operation_id) DO UPDATE SET requested_at=excluded.requested_at", op.ID(), time.Now().Unix())
-		return unavailable(), nil
+	err := s.Store.DB.QueryRowContext(ctx, "SELECT payload,updated_at,source_generation FROM current_recognition WHERE operation_id=?", op.ID()).Scan(&payload, &updated, &generation)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
-	var out any
-	if json.Unmarshal([]byte(payload), &out) != nil {
-		return unavailable(), nil
+	var out []map[string]any
+	if err == nil && json.Unmarshal([]byte(payload), &out) == nil && len(out) > 0 {
+		durable := generation != "" && out[0]["status"] == "recognized"
+		successful := out[0]["status"] != "provider_unavailable" && out[0]["status"] != "unavailable" && out[0]["status"] != nil
+		if durable || time.Now().Unix()-updated <= 60 {
+			return out, nil
+		}
+		if successful {
+			_, err = s.Store.DB.ExecContext(ctx, "INSERT INTO recognition_requests VALUES(?,?) ON CONFLICT(operation_id) DO UPDATE SET requested_at=excluded.requested_at", op.ID(), time.Now().Unix())
+			return out, err
+		}
 	}
-	return out, nil
+	_, err = s.Store.DB.ExecContext(ctx, "INSERT INTO recognition_requests VALUES(?,?) ON CONFLICT(operation_id) DO UPDATE SET requested_at=excluded.requested_at", op.ID(), time.Now().Unix())
+	return unavailable(), err
 }
 func (s *Syncer) NoteRecognition(ctx context.Context, c config.Chain, commitment wire.Field) (any, error) {
 	scope := Scope(c)
 	var payload string
-	var updated int64
-	e := s.Store.DB.QueryRowContext(ctx, "SELECT r.payload,r.updated_at FROM public_notes n JOIN operations o ON o.id=n.operation_id JOIN remote_recognition r ON r.operation_id=o.id WHERE n.chain_id=? AND n.protocol_address=? AND n.commitment=? AND o.canonical=1 ORDER BY r.updated_at DESC LIMIT 1", scope.ChainID, scope.ProtocolAddress, string(commitment)).Scan(&payload, &updated)
-	if e != nil || time.Now().Unix()-updated > 60 {
+	err := s.Store.DB.QueryRowContext(ctx, "SELECT o.payload FROM public_notes n JOIN operations o ON o.id=n.operation_id WHERE n.chain_id=? AND n.protocol_address=? AND n.commitment=? AND o.canonical=1 ORDER BY o.block_number DESC LIMIT 1", scope.ChainID, scope.ProtocolAddress, string(commitment)).Scan(&payload)
+	if errors.Is(err, sql.ErrNoRows) {
 		return unavailable(), nil
 	}
-	var out any
-	if json.Unmarshal([]byte(payload), &out) != nil {
+	if err != nil {
+		return nil, err
+	}
+	var op model.Operation
+	if err = json.Unmarshal([]byte(payload), &op); err != nil {
 		return unavailable(), nil
 	}
-	return out, nil
+	return s.Recognition(ctx, c, op)
 }
 
 // HydrateRecognition runs independently of chain synchronization and public reads.
@@ -92,7 +114,27 @@ func (s *Syncer) NoteRecognition(ctx context.Context, c config.Chain, commitment
 // is cached and skipped so unavailable placeholders cannot starve known rows.
 func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 	scope := Scope(c)
-	rows, e := s.Store.DB.QueryContext(ctx, "SELECT o.payload FROM operations o LEFT JOIN remote_recognition r ON r.operation_id=o.id LEFT JOIN recognition_requests q ON q.operation_id=o.id WHERE o.chain_id=? AND o.protocol_address=? AND o.canonical=1 AND (q.operation_id IS NOT NULL OR o.id IN (SELECT id FROM operations WHERE chain_id=? AND protocol_address=? AND canonical=1 ORDER BY block_number DESC LIMIT 200)) AND (r.updated_at IS NULL OR r.updated_at<?) ORDER BY q.requested_at DESC,COALESCE(r.updated_at,0),o.block_number DESC LIMIT 20", scope.ChainID, scope.ProtocolAddress, scope.ChainID, scope.ProtocolAddress, time.Now().Unix()-20)
+	if c.ProvenanceURL == "" {
+		return nil
+	}
+	if err := s.Store.ConfigureRecognition(ctx, scope, c.ProvenanceURL, c.IssuerID); err != nil {
+		return err
+	}
+	binding, err := s.Store.RecognitionContext(ctx, scope)
+	if err != nil {
+		return err
+	}
+	rows, e := s.Store.DB.QueryContext(ctx, `SELECT o.payload FROM operations o
+ LEFT JOIN current_recognition r ON r.operation_id=o.id
+ LEFT JOIN remote_recognition cached ON cached.operation_id=o.id
+ LEFT JOIN recognition_requests q ON q.operation_id=o.id
+ LEFT JOIN recognition_attempts a ON a.operation_id=o.id AND a.epoch=? AND a.chain_generation=?
+ WHERE o.chain_id=? AND o.protocol_address=? AND o.canonical=1
+ AND (q.operation_id IS NOT NULL OR cached.operation_id IS NOT NULL OR o.id IN
+ (SELECT id FROM operations WHERE chain_id=? AND protocol_address=? AND canonical=1 ORDER BY block_number DESC LIMIT 200))
+ AND (r.operation_id IS NULL OR ((COALESCE(json_extract(r.payload,'$[0].status'),'')<>'recognized' OR r.source_generation='') AND r.updated_at<?))
+ AND (a.operation_id IS NULL OR a.attempted_at<?)
+ ORDER BY COALESCE(a.attempted_at,0),q.requested_at DESC,COALESCE(r.updated_at,0),o.block_number DESC LIMIT 20`, binding.Epoch, binding.ChainGeneration, scope.ChainID, scope.ProtocolAddress, scope.ChainID, scope.ProtocolAddress, time.Now().Unix()-20, time.Now().Unix()-20)
 	if e != nil {
 		return e
 	}
@@ -116,6 +158,9 @@ func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 		return e
 	}
 	for _, op := range ops {
+		if e = s.Store.RecordRecognitionAttempt(ctx, op, binding, time.Now().Unix()); e != nil {
+			return e
+		}
 		requestCtx, stop := context.WithTimeout(ctx, 2*time.Second)
 		var r map[string]any
 		e = Call(requestCtx, s.Client, c.ProvenanceURL, "provenance_getOperationRecognition", []any{map[string]any{"blockHash": op.BlockHash, "txHash": op.TxHash, "operationIndex": op.OperationIndex}}, &r)
@@ -128,12 +173,11 @@ func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 					reason = "NOT_FOUND"
 				}
 				pending := []any{map[string]any{"status": "provider_unavailable", "reason": reason, "source": "provenance"}}
-				if cacheErr := s.Store.SaveRecognition(ctx, op, pending, time.Now().Unix()); cacheErr != nil {
+				if cacheErr := s.Store.SaveBoundRecognition(ctx, op, pending, time.Now().Unix(), binding); cacheErr != nil {
 					return cacheErr
 				}
 				continue
 			}
-			_ = s.Store.SaveRecognition(ctx, op, unavailable(), time.Now().Unix())
 			return e
 		}
 		var returned model.Operation
@@ -141,9 +185,12 @@ func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 		var responseScope wire.Scope
 		scopeBytes, _ := json.Marshal(r["scope"])
 		_ = json.Unmarshal(scopeBytes, &responseScope)
-		if json.Unmarshal(b, &returned) != nil || returned.ID() != op.ID() || returned.BlockNumber != op.BlockNumber || returned.Success != op.Success || responseScope.Key() != scope.Key() || c.IssuerID != "" && r["providerId"] != c.IssuerID {
-			_ = s.Store.SaveRecognition(ctx, op, unavailable(), time.Now().Unix())
+		if json.Unmarshal(b, &returned) != nil || returned.ID() != op.ID() || returned.BlockNumber != op.BlockNumber || returned.Success != op.Success || responseScope.Key() != scope.Key() || c.IssuerID != "" && r["providerId"] != c.IssuerID || binding.Provider != "" && r["providerId"] != binding.Provider || binding.Generation != "" && r["chainGeneration"] != binding.Generation {
 			return fmt.Errorf("recognition identity mismatch")
+		}
+		state, ok := r["recognitionState"].(string)
+		if !ok || !validRecognitionState(state) {
+			return fmt.Errorf("invalid recognition state")
 		}
 		if op.UnsupportedReason != "" && returned.UnsupportedReason == "" {
 			returned.Canonical = true
@@ -152,14 +199,14 @@ func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 			}
 		}
 		out := map[string]any{}
-		for _, k := range []string{"recognitionState", "recognition", "providerDecisions", "fundingChecks", "assessmentHistory", "chainGeneration", "checkpointSequence", "scope"} {
+		for _, k := range []string{"recognitionState", "recognition", "providerDecisions", "fundingChecks", "assessmentHistory", "chainGeneration", "checkpointSequence", "scope", "providerId"} {
 			if v, ok := r[k]; ok {
 				out[k] = v
 			}
 		}
 		out["source"] = "provenance"
-		out["status"] = r["recognitionState"]
-		if e = s.Store.SaveRecognition(ctx, op, PublicRecognition([]any{out}), time.Now().Unix()); e != nil {
+		out["status"] = state
+		if e = s.Store.SaveBoundRecognition(ctx, op, PublicRecognition([]any{out}), time.Now().Unix(), binding); e != nil {
 			return e
 		}
 	}
@@ -180,6 +227,13 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 		return nil
 	}
 	scope := Scope(c)
+	if e := s.Store.ConfigureRecognition(ctx, scope, c.ProvenanceURL, c.IssuerID); e != nil {
+		return e
+	}
+	binding, e := s.Store.RecognitionContext(ctx, scope)
+	if e != nil {
+		return e
+	}
 	var status struct {
 		Scope      wire.Scope `json:"scope"`
 		ProviderID string     `json:"providerId"`
@@ -189,13 +243,19 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 	if e := Call(ctx, s.Client, c.ProvenanceURL, "provenance_getStatus", []any{}, &status); e != nil {
 		return e
 	}
-	if status.Scope.Key() != scope.Key() || c.IssuerID != "" && status.ProviderID != c.IssuerID {
+	if status.Scope.Key() != scope.Key() || status.ProviderID == "" || c.IssuerID != "" && status.ProviderID != c.IssuerID {
 		return fmt.Errorf("recognition scope mismatch")
 	}
 	if _, e := wire.Uint64(status.Generation); e != nil {
 		return e
 	}
 	if _, e := wire.Uint64(status.Sequence); e != nil {
+		return e
+	}
+	if status.Generation == "0" {
+		return fmt.Errorf("invalid recognition generation")
+	}
+	if e := s.Store.ObserveRecognitionGeneration(ctx, scope, binding, status.ProviderID, status.Generation); e != nil {
 		return e
 	}
 	var after sql.NullString
@@ -260,3 +320,13 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 	return nil
 }
 func pad(n string) string { v, _ := strconv.ParseUint(n, 10, 64); return fmt.Sprintf("%020d", v) }
+
+// Unknown states cannot replace a successful cached decision.
+func validRecognitionState(state string) bool {
+	switch state {
+	case "recognized", "recognition_pending", "pending_source", "pending_confirmation", "pending_proof", "pending_dependencies", "source_rejected", "not_applicable", "chain_reorged", "unsupported", "verifying":
+		return true
+	default:
+		return false
+	}
+}

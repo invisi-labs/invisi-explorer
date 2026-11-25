@@ -35,7 +35,7 @@ func (e *Explorer) overview(ctx context.Context, q query) (any, error) {
 	out := map[string]any{"transactions": counts["transactions"], "operations": counts["operations"], "notes": counts["notes"], "creditStates": counts["creditStates"], "grants": counts["grants"], "recognizedNotes": nil, "recognizedNotesBasis": "unavailable_remote_recognition", "updatedAt": s.AcquiredAt, "snapshot": s}
 	var recognized, known int64
 	var recognitionArgs []any
-	countSQL := "SELECT COUNT(DISTINCT CASE WHEN json_extract(r.payload,'$[0].status')='recognized' THEN n.commitment END),COUNT(DISTINCT CASE WHEN r.updated_at>=? AND json_extract(r.payload,'$[0].status') NOT IN ('provider_unavailable','unavailable') THEN n.commitment END) FROM public_notes n JOIN operations o ON o.id=n.operation_id LEFT JOIN remote_recognition r ON r.operation_id=o.id WHERE " + where + " AND " + e.successSQL()
+	countSQL := "SELECT COUNT(DISTINCT CASE WHEN json_extract(r.payload,'$[0].status')='recognized' THEN n.commitment END),COUNT(DISTINCT CASE WHEN (r.updated_at>=? OR (r.source_generation<>'' AND json_extract(r.payload,'$[0].status')='recognized')) AND json_extract(r.payload,'$[0].status') NOT IN ('provider_unavailable','unavailable') THEN n.commitment END) FROM public_notes n JOIN operations o ON o.id=n.operation_id LEFT JOIN current_recognition r ON r.operation_id=o.id WHERE " + where + " AND " + e.successSQL()
 	// The freshness placeholder occurs before the snapshot/filter placeholders.
 	recognitionArgs = append([]any{time.Now().Unix() - 60}, args...)
 	if e.db.QueryRowContext(ctx, e.sql(countSQL), recognitionArgs...).Scan(&recognized, &known) == nil && known > 0 && strconv.FormatInt(known, 10) == counts["notes"] {

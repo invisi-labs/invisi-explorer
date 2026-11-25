@@ -292,15 +292,21 @@ func (s *Store) Enrich(ctx context.Context, op model.Operation) error {
 	return tx.Commit()
 }
 func (s *Store) SaveRecognition(ctx context.Context, op model.Operation, value any, now int64) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = saveRecognition(ctx, tx, op, value, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+func saveRecognition(ctx context.Context, tx *sql.Tx, op model.Operation, value any, now int64) error {
 	b, e := json.Marshal(value)
 	if e != nil {
 		return e
 	}
-	tx, e := s.DB.BeginTx(ctx, nil)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback()
 	var old string
 	_ = tx.QueryRowContext(ctx, "SELECT payload FROM remote_recognition WHERE operation_id=?", op.ID()).Scan(&old)
 	if _, e = tx.ExecContext(ctx, "INSERT INTO remote_recognition VALUES(?,?,?) ON CONFLICT(operation_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at", op.ID(), string(b), now); e != nil {
@@ -310,12 +316,9 @@ func (s *Store) SaveRecognition(ctx context.Context, op model.Operation, value a
 		return e
 	}
 	if old != string(b) {
-		scope := wire.Scope{ChainID: op.ChainID, ProtocolAddress: op.ProtocolAddress}
-		if _, e = tx.ExecContext(ctx, "INSERT INTO readmodel_versions VALUES(?,1) ON CONFLICT(id) DO UPDATE SET version=version+1", scope.Key()); e != nil {
-			return e
-		}
+		return bumpRecognitionVersion(ctx, tx, wire.Scope{ChainID: op.ChainID, ProtocolAddress: op.ProtocolAddress})
 	}
-	return tx.Commit()
+	return nil
 }
 func (s *Store) SourceStatus(ctx context.Context, scope wire.Scope, source, status string, value any) error {
 	b, _ := json.Marshal(value)

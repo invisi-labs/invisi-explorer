@@ -30,3 +30,15 @@ CREATE INDEX IF NOT EXISTS token_metadata_retry ON token_metadata(chain_id,retry
 CREATE TABLE IF NOT EXISTS credit_history_retry(operation_id TEXT PRIMARY KEY,retry_at INTEGER NOT NULL);
 
 CREATE INDEX IF NOT EXISTS public_grant_history_identity ON public_grant_ids(chain_id,protocol_address,LOWER(token_address),LOWER(payer),grant_id,block_number,operation_id);
+
+-- Cache payloads survive invalidation; bindings decide whether they are current.
+CREATE TABLE IF NOT EXISTS recognition_sources(scope TEXT PRIMARY KEY,url TEXT NOT NULL,issuer TEXT NOT NULL,provider TEXT NOT NULL DEFAULT '',generation TEXT NOT NULL DEFAULT '',epoch INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS recognition_bindings(operation_id TEXT PRIMARY KEY,scope TEXT NOT NULL,epoch INTEGER NOT NULL,chain_generation TEXT NOT NULL);
+CREATE VIEW IF NOT EXISTS current_recognition AS
+SELECT r.operation_id,r.payload,r.updated_at,s.generation AS source_generation
+FROM remote_recognition r
+JOIN recognition_bindings b ON b.operation_id=r.operation_id
+JOIN recognition_sources s ON s.scope=b.scope AND s.epoch=b.epoch
+JOIN operations o ON o.id=r.operation_id AND o.canonical=1
+WHERE b.chain_generation=COALESCE((SELECT generation FROM chain_generations WHERE id=b.scope),'00000000000000000001');
+CREATE TABLE IF NOT EXISTS recognition_attempts(operation_id TEXT PRIMARY KEY,epoch INTEGER NOT NULL,chain_generation TEXT NOT NULL,attempted_at INTEGER NOT NULL);

@@ -50,7 +50,7 @@ func TestRecognitionHydrationUsesPositionalQueriesAndBindsScope(t *testing.T) {
 					http.Error(w, "bad params", 400)
 					return
 				}
-				result := map[string]any{"scope": scope, "chainGeneration": "1", "checkpointSequence": "0"}
+				result := map[string]any{"scope": scope, "chainGeneration": "1", "checkpointSequence": "0", "providerId": "issuer"}
 				switch q.Method {
 				case "provenance_getStatus":
 					if len(q.Params) != 0 {

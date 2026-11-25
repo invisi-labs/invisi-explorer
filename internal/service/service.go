@@ -62,6 +62,9 @@ func Run(ctx context.Context, c config.Config) error {
 		return config.Chain{}
 	}
 	for _, v := range c.Chains {
+		if e = store.ConfigureRecognition(ctx, upstream.Scope(v), v.ProvenanceURL, v.IssuerID); e != nil {
+			return e
+		}
 		scopes = append(scopes, upstream.Scope(v))
 	}
 	livePublicState := &publicState{syncer: syncer, chains: c.Chains}
