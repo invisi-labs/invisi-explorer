@@ -1,3 +1,4 @@
+import { TermHelp } from "./TermHelp";
 import type { ReactNode } from "react";
 import { fundingView, type ExecutionAuthorization } from "./funding";
 import type { Key } from "./i18n";
@@ -47,10 +48,10 @@ export function TransactionExecutionPanel({ operations, t, address }: {
     <h2>{t("transactionExecutionTitle")}</h2>
     {view.conflict ? <p className="muted">{t("fundingInvalid")}</p> : <>
       <dl className="public-fields">
-        <dt>{t("fundingSubmitter")}</dt><dd>{view.sender ? address(view.sender, "address") : t("fundingUnknown")}<p className="muted">{t("fundingSubmitterCaveat")}</p></dd>
+        <dt>{t("fundingSubmitter")}<TermHelp term="fundingSubmitter" label={t("fundingSubmitter")} t={t}/></dt><dd>{view.sender ? address(view.sender, "address") : t("fundingUnknown")}<p className="muted">{t("fundingSubmitterCaveat")}</p></dd>
         <dt>{t("fundingTransactionTo")}</dt><dd>{view.to ? address(view.to, "address") : t("fundingUnknown")}</dd>
         <dt>{t("transactionCore")}</dt><dd>{view.core ? address(view.core, "address") : t("fundingUnknown")}</dd>
-        <dt>{t("fundingType")}</dt><dd>{view.type === "4" ? <strong>EIP-7702 · {t("fundingType")} 4</strong> : view.type !== null ? t("fundingRegularTransaction").replace("{type}", view.type) : t("fundingUnknown")}</dd>
+        <dt>{t("fundingType")}<TermHelp term="fundingType" label={t("fundingType")} t={t}/></dt><dd>{view.type === "4" ? <strong>EIP-7702 · {t("fundingType")} 4</strong> : view.type !== null ? t("fundingRegularTransaction").replace("{type}", view.type) : t("fundingUnknown")}</dd>
       </dl>
       {view.authorizations.length > 0 && <details className="funding-calls">
         <summary>{t("fundingAuthorizations")}</summary><p className="muted">{t("fundingAuthorizationCaveat")}</p>

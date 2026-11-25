@@ -9,7 +9,7 @@ const operations=Array.from({length:4},(_,i)=>({...locator,operationIndex:String
 const render=(ops:Record<string,any>[])=>renderToStaticMarkup(<TransactionExecutionPanel operations={ops} t={k=>dictionaries.en[k]} address={v=><code>{v}</code>}/>);
 it("shows one bound outer transaction summary for four members",()=>{
  const html=render(operations);
- expect(html.match(/Transaction submitter \/ Broadcaster/g)).toHaveLength(1);
+ expect(html.match(/<dt>Transaction submitter \/ Broadcaster/g)).toHaveLength(1);
  expect(html.match(new RegExp(sender,"g"))).toHaveLength(1);
  expect(html).toContain("Regular transaction (Type 0)");
  expect(html).toContain("Core contract");

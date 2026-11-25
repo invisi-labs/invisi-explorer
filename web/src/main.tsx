@@ -24,6 +24,7 @@ import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
 import { BroadcastersPanel } from "./BroadcastersPanel";
 import { AdvancedTools } from "./AdvancedTools";
+import { TermHelp } from "./TermHelp";
 import { CopyButton } from "./CopyButton";
 import { AmountDisplay } from "./AmountDisplay";
 import { AddressReference } from "./AddressReference";
@@ -328,6 +329,11 @@ function Listing({
           </small>
         )}
       </div>
+      <div className="mobile-table-help">
+        {["transactions","notes"].includes(type) && <span>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></span>}
+        {type === "notes" && <span>{t("noteCommitmentLabel")}<TermHelp term="noteCommitmentLabel" label={t("noteCommitmentLabel")} t={t}/></span>}
+        {type === "nullifiers" && <span>Nullifier<TermHelp term="nullifier" label="Nullifier" t={t}/></span>}
+      </div>
       {result.notice && <p className="pagination-message" role="status">{t(result.notice === "updated" ? "paginationUpdated" : "paginationRestarted")}</p>}
       {result.error && result.data && <div className="pagination-message" role="alert">
         <span>{t(result.error.code === "CONFLICT" ? "paginationChanging" : "unavailable")}</span>
@@ -342,18 +348,18 @@ function Listing({
           <table className={type === "grants" ? "public-list grants-table" : "public-list"}>
             <thead>
               <tr>
-                <th>{identityLabel}</th>
+                <th>{identityLabel}<TermHelp term={type === "notes" ? "noteCommitmentLabel" : type === "credit-states" ? "creditCommitmentLabel" : type === "nullifiers" ? "nullifier" : ""} label={identityLabel} t={t}/></th>
                 <th>{t("network")}</th>
                 {type === "transactions" && (
                   <>
                     <th>{t("transactionTypeLabel")}</th>
                     <th>{t("execution")}</th>
                     <th>{t("amount")}</th>
-                    <th>{t("recognition")}</th>
+                    <th>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></th>
                   </>
                 )}
                 {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("grantHistoryCount")}</th></>}
-                {type === "notes" && <><th>{t("noteGenerationMethod")}</th><th title={t("notePublicAmountHint")}>{t("notePublicAmount")}</th><th>{t("recognition")}</th></>}
+                {type === "notes" && <><th>{t("noteGenerationMethod")}</th><th title={t("notePublicAmountHint")}>{t("notePublicAmount")}</th><th>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></th></>}
                 <th>
                   <button className="plain" onClick={() => setFull((x) => !x)}>
                     {t(full ? "time" : "age")} ⇄
@@ -585,7 +591,7 @@ function PublicFields({ data, showSourceTransaction = true, showNoteAmount = fal
         ([key, label]) =>
           (data[key] !== undefined || (key === "amount" && showNoteAmount)) && !(isCreditOperation(data.kind) && ["withdrawalAmount", "feeAmount"].includes(key)) && (
             <React.Fragment key={key}>
-              <dt>{t(label)}</dt>
+              <dt>{t(label)}<TermHelp term={label} label={t(label)} t={t}/></dt>
               <dd>
                 {key === "timestamp" ? (
                   fullTime(data[key])
@@ -613,7 +619,7 @@ function PublicFields({ data, showSourceTransaction = true, showNoteAmount = fal
       )}
       {showProtocol && data.protocolAddress && (
         <>
-          <dt>{t("protocol")}</dt>
+          <dt>{t("protocol")}<TermHelp term="protocol" label={t("protocol")} t={t}/></dt>
           <dd>
             <Address value={data.protocolAddress} kind="address" data={data} />
           </dd>
@@ -753,8 +759,8 @@ function Detail({ type, id }: { type: string; id: string }) {
                     <div className="table-wrap note-outputs-wrap">
                       <table className="note-outputs-table">
                         <thead><tr>
-                          <th>{t("noteCommitmentLabel")}</th><th>{t("outputAmount")}</th>
-                          <th>{t("treeIdLabel")}</th><th>{t("leafIndexLabel")}</th>
+                          <th>{t("noteCommitmentLabel")}<TermHelp term="noteCommitmentLabel" label={t("noteCommitmentLabel")} t={t}/></th><th>{t("outputAmount")}</th>
+                          <th>{t("treeIdLabel")}<TermHelp term="treeIdLabel" label={t("treeIdLabel")} t={t}/></th><th>{t("leafIndexLabel")}<TermHelp term="leafIndexLabel" label={t("leafIndexLabel")} t={t}/></th>
                         </tr></thead>
                         <tbody>{op.noteOutputs.map((note: RecordData, j: number) => (
                           <tr key={note.noteCommitment ?? j}>

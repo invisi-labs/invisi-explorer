@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplify mobile branding and add localized, accessible terminology help for source recognition, private Notes, execution roles and finality.
+
 ## 1.3.7
 
 - Persist recognized provenance results across temporary query failures while continuing pending-result refresh. Fence cached results by canonical bindings, source generations and reorg epochs.

@@ -1,5 +1,18 @@
+import { termStrings } from "./termStrings";
 export type Language = "en" | "zh-Hans" | "zh-Hant";
 const en = {
+  "termHelp_recognition": termStrings["termHelp_recognition"][2],
+  "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][2],
+  "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][2],
+  "termHelp_nullifier": termStrings["termHelp_nullifier"][2],
+  "termHelp_creditCommitmentLabel": termStrings["termHelp_creditCommitmentLabel"][2],
+  "termHelp_confirmed": termStrings["termHelp_confirmed"][2],
+  "termHelp_protocol": termStrings["termHelp_protocol"][2],
+  "termHelp_treeIdLabel": termStrings["termHelp_treeIdLabel"][2],
+  "termHelp_leafIndexLabel": termStrings["termHelp_leafIndexLabel"][2],
+  "termHelp_fundingSubmitter": termStrings["termHelp_fundingSubmitter"][2],
+  "termHelp_fundingType": termStrings["termHelp_fundingType"][2],
+
   fundingCaller: "Core caller / Router",
   fundingAmount: "Transfer amount",
   fundingTitle: "Funding and execution",
@@ -323,6 +336,18 @@ const en = {
   finalityConflict: "Finalized history conflict",
 };
 const hans: Record<keyof typeof en, string> = {
+  "termHelp_recognition": termStrings["termHelp_recognition"][0],
+  "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][0],
+  "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][0],
+  "termHelp_nullifier": termStrings["termHelp_nullifier"][0],
+  "termHelp_creditCommitmentLabel": termStrings["termHelp_creditCommitmentLabel"][0],
+  "termHelp_confirmed": termStrings["termHelp_confirmed"][0],
+  "termHelp_protocol": termStrings["termHelp_protocol"][0],
+  "termHelp_treeIdLabel": termStrings["termHelp_treeIdLabel"][0],
+  "termHelp_leafIndexLabel": termStrings["termHelp_leafIndexLabel"][0],
+  "termHelp_fundingSubmitter": termStrings["termHelp_fundingSubmitter"][0],
+  "termHelp_fundingType": termStrings["termHelp_fundingType"][0],
+
   fundingCaller: "Core 调用方 / Router",
   fundingAmount: "转移金额",
   fundingTitle: "资金来源与执行",
@@ -633,6 +658,18 @@ const hans: Record<keyof typeof en, string> = {
 };
 const hant: Record<keyof typeof en, string> = {
   ...hans,
+  "termHelp_recognition": termStrings["termHelp_recognition"][1],
+  "termHelp_noteCommitmentLabel": termStrings["termHelp_noteCommitmentLabel"][1],
+  "termHelp_noteInputsCount": termStrings["termHelp_noteInputsCount"][1],
+  "termHelp_nullifier": termStrings["termHelp_nullifier"][1],
+  "termHelp_creditCommitmentLabel": termStrings["termHelp_creditCommitmentLabel"][1],
+  "termHelp_confirmed": termStrings["termHelp_confirmed"][1],
+  "termHelp_protocol": termStrings["termHelp_protocol"][1],
+  "termHelp_treeIdLabel": termStrings["termHelp_treeIdLabel"][1],
+  "termHelp_leafIndexLabel": termStrings["termHelp_leafIndexLabel"][1],
+  "termHelp_fundingSubmitter": termStrings["termHelp_fundingSubmitter"][1],
+  "termHelp_fundingType": termStrings["termHelp_fundingType"][1],
+
   fundingCaller: "Core 呼叫方 / Router",
   fundingAmount: "轉移金額",
   fundingTitle: "資金來源與執行",

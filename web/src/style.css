@@ -280,8 +280,9 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
   .language-trigger { gap: 5px; padding: 8px; font-size: 12px; }
   .language-trigger > svg:first-child { width: 16px; }
 }
-@media (max-width: 380px) {
+@media (max-width: 767px) {
   .brand-name { display: none; }
+  .brand-product { margin-left: 0; padding-left: 0; border-left: 0; font-size: 16px; color: var(--ink); }
 }
 
 /* 公共资金证据：保留地址与资产各自的上下文，不以视觉顺序推断所有权。 */
@@ -489,3 +490,13 @@ nav .advanced-tools-panel a { display: flex; border-radius: 8px; white-space: no
 .note-inputs ul { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
 .note-inputs li { min-width: 0; }
 .transaction-execution .public-fields dd > .muted { margin: 6px 0 0; font-size: 12px; }
+
+.term-label { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.term-help { display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; }
+button.term-help-trigger { display:inline-grid; place-items:center; width:24px; height:24px; min-height:24px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--secondary); font:500 12px/1 sans-serif; cursor:help; }
+button.term-help-trigger:hover,button.term-help-trigger[aria-expanded=true] { background:var(--purple-soft); color:var(--purple-ink); }
+button.term-help-trigger:focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
+.term-help-bubble { position:fixed; z-index:10000; width:max-content; max-width:min(320px,calc(100vw - 24px)); padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-size:12px; font-weight:400; line-height:1.8; white-space:normal; overflow-wrap:anywhere; box-shadow:0 8px 28px #18181b20; text-align:left; }
+
+.mobile-table-help { display:none; }
+@media(max-width:767px) { .mobile-table-help { display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; color:var(--secondary); font-size:12px; margin:0 0 12px; }.mobile-table-help > span { display:inline-flex; align-items:center; } }

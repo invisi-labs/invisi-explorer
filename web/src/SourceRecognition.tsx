@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TermHelp } from "./TermHelp";
 import { RecognitionSummary } from "./RecognitionSummary";
 import { recognitionQueryStatus, showsSourceRecognition } from "./public";
 import type { Key } from "./i18n";
@@ -7,7 +8,7 @@ export function SourceRecognition({data,t,status,aside=false}:{data:RecordData;t
   if (!showsSourceRecognition("",data)) return null;
   const rows: RecordData[]=Array.isArray(data.recognition)?data.recognition:data.recognition && typeof data.recognition==="object"?[data.recognition]:[];
   return <section className={aside?"card":"operation-recognition"} aria-label={t("recognition")}>
-    {aside?<h2>{t("recognition")}</h2>:<h3>{t("recognition")}</h3>}
+    {aside?<h2>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></h2>:<h3>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></h3>}
     {rows.length?rows.map((row,i)=><div key={i}>
       <RecognitionSummary data={row} t={t} status={status}/>
       <details><summary>{t("recognitionDetails")}</summary><pre>{JSON.stringify(row,null,2)}</pre></details>

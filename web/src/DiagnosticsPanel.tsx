@@ -1,3 +1,4 @@
+import { TermHelp } from "./TermHelp";
 import type { ReactNode } from "react";
 import type { Key } from "./i18n";
 import { finalityKey, fullTime } from "./public";
@@ -49,7 +50,7 @@ export function DiagnosticsPanel({
                   ] as const
                 ).map((key) => (
                   <th scope="col" key={key}>
-                    {t(key)}
+                    {t(key)}<TermHelp term={key} label={t(key)} t={t}/>
                   </th>
                 ))}
               </tr>
