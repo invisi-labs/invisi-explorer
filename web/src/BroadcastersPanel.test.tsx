@@ -1,7 +1,7 @@
 import {expect,it} from "vitest";
 import {renderToStaticMarkup} from "react-dom/server";
 import {MemoryRouter} from "react-router-dom";
-import {BroadcastersPanel,broadcasterState} from "./BroadcastersPanel";
+import {BroadcastersPanel,broadcasterState,provenanceRequestObservation} from "./BroadcastersPanel";
 import {dictionaries} from "./i18n";
 const t=(key:keyof typeof dictionaries.en)=>dictionaries.en[key];
 const record={operator:"0x1111111111111111111111111111111111111111",enabled:true,endpoint:"https://relay.example/v1/chains/97",chainId:"97",protocolAddress:"core",observation:{status:"available",checkedAt:1000,responseMillis:21,identityStatus:"matched",tokensStatus:"not_provided",service:{submissionHalted:false,provenance:{enabled:true,health:"available",checkedAt:"1"}}}};
@@ -17,7 +17,7 @@ it("separates chain registration and observed runtime availability",()=>{
 it("keeps old token catalogs unknown, old provenance health stale and technical details collapsed",()=>{
  const html=render(record,true);
  expect(html).toContain("does not provide a complete token catalog");
- expect(html).toContain("Stale observation");
+ expect(html).toContain("Last verification request succeeded");
  expect(html).not.toContain("Relay statistics");
  expect(html).toContain('<details class="card bc-technical">');
  expect(html).not.toMatch(/<details[^>]*\bopen/);
@@ -53,4 +53,19 @@ it("shows a single deployment as read-only rather than an empty-choice dropdown"
  expect(html).toContain('bc-deployment-value');
  expect(html).not.toContain('<select');
  expect(html).toContain('<code>core</code>');
+});
+it("shows old provenance results as request history rather than expiring service health",()=>{
+ const html=render(record,true);
+ expect(html).toContain('Last verification request succeeded');
+ expect(html).not.toContain('Stale observation');
+ const failed=render({...record,observation:{...record.observation,service:{...record.observation.service,provenance:{enabled:true,health:'unavailable',checkedAt:'1'}}}},true);
+ expect(failed).toContain('Last verification request failed');
+ const missing=render({...record,observation:{...record.observation,service:{...record.observation.service,provenance:{enabled:true,health:'not_checked'}}}},true);
+ expect(missing).toContain('No verification request recorded');
+});
+
+it("does not invent verification freshness from missing or invalid request timestamps",()=>{
+ for(const checkedAt of [undefined,"NaN","-1","1031"]){expect(provenanceRequestObservation({health:"available",checkedAt},1000).key).toBe("bcSourceNotChecked");}
+ expect(provenanceRequestObservation({health:"available",checkedAt:"1"},1000)).toEqual({key:"bcSourceRequestSuccess",checkedAt:"1"});
+ expect(provenanceRequestObservation({health:"not_checked",checkedAt:"1"},1000).key).toBe("bcSourceRequestUnknown");
 });

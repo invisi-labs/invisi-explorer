@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Key } from "./i18n";
+import { HelpTip } from "./HelpTip";
 import { fullTime } from "./public";
 import {
   broadcasterScopes,
@@ -49,6 +50,23 @@ export function broadcasterState(row: Row): Key {
       } as Record<string, Key>
     )[observation.status] ?? "bcNotProbed"
   );
+}
+export function provenanceRequestObservation(
+  provider: Row | undefined,
+  now = Date.now() / 1000,
+): { key: Key; checkedAt?: string } {
+  const checked = Number(provider?.checkedAt);
+  if (!Number.isSafeInteger(checked) || checked <= 0 || checked > now + 30)
+    return { key: "bcSourceNotChecked" };
+  return {
+    key:
+      provider?.health === "available"
+        ? "bcSourceRequestSuccess"
+        : provider?.health === "unavailable"
+          ? "bcSourceRequestFailed"
+          : "bcSourceRequestUnknown",
+    checkedAt: String(checked),
+  };
 }
 function tokenAvailable(token: Row): boolean {
   return (
@@ -279,11 +297,7 @@ export function BroadcastersPanel({
           const service = observation.service;
           const tokens: Row[] = observation.tokens ?? [];
           const provider = service?.provenance;
-          const providerTime = Number(provider?.checkedAt);
-          const providerStale =
-            !providerTime ||
-            Date.now() / 1000 - providerTime > 90 ||
-            providerTime > Date.now() / 1000 + 30;
+          const sourceRequest = provenanceRequestObservation(provider);
           const source = (data.sources ?? []).find(
             (source: Row) =>
               String(source.chainId) === String(row.chainId) &&
@@ -397,21 +411,21 @@ export function BroadcastersPanel({
                   <dd>{yesNo(provider?.aggregateSupported)}</dd>
                   <dt>{t("bcFeeLock")}</dt>
                   <dd>{yesNo(service?.feeLock?.core)}</dd>
-                  <dt>{t("bcScreening")}</dt>
+                  <dt>
+                    {t("bcScreening")}
+                    <HelpTip
+                      label={t("bcScreening") + " · ?"}
+                      text={t("bcSourceObservationHint")}
+                    />
+                  </dt>
                   <dd>
                     {yesNo(provider?.enabled)}
                     {provider?.enabled && (
                       <small className="bc-detail-hint">
-                        {t(
-                          providerStale
-                            ? "bcStale"
-                            : provider.health === "available"
-                              ? "bcOnline"
-                              : provider.health === "unavailable"
-                                ? "bcUnreachable"
-                                : "unknown",
-                        )}{" "}
-                        · {time(provider?.checkedAt)}
+                        {t(sourceRequest.key)}
+                        {sourceRequest.checkedAt && (
+                          <> · {time(sourceRequest.checkedAt)}</>
+                        )}
                       </small>
                     )}
                   </dd>

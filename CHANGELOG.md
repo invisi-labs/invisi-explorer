@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Present Provenance availability as the result of the last verification request, avoiding false expiry warnings for idle services. Keep Explorer observation freshness separate.
+
 - Use consistent protocol terminology in public labels and help, and share a lighter violet-neutral palette for surfaces, table headings and summary panels.
 
 - Remove repeated protocol fields from transaction operation details and simplify public-funding labels without the Core prefix.
