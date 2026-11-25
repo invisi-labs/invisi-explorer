@@ -11,7 +11,7 @@ it("separates chain registration and observed runtime availability",()=>{
  expect(broadcasterState({...record,observation:{...record.observation,status:"halted"}})).toBe("bcPaused");
  expect(broadcasterState({...record,observation:{...record.observation,stale:true}})).toBe("bcStale");
  const html=render({items:[record],directoryComplete:true});
- expect(html).toContain("Enabled");expect(html).toContain("Online");expect(html).toContain("Not provided");
+ expect(html).toContain("Enabled");expect(html).toContain("Online");expect(html).toContain("21 ms");
  expect(html).not.toContain("None currently available");
 });
 it("keeps old token catalogs unknown, old provenance health stale and technical details collapsed",()=>{
@@ -28,5 +28,13 @@ it("ignores legacy private statistics while retaining public configured token av
  const html=render(data,true);
  expect(html).toContain("TOKEN(A)");expect(html).toContain("TOKEN(B)");expect(html).toContain("Pricing unavailable");
  expect(html).not.toContain("Relay statistics");expect(html).not.toContain("987654321");expect(html).not.toContain("100.00%");
- const list=render({items:[data],directoryComplete:true});expect(list).toContain("TOKEN(A)");expect(list).not.toContain("TOKEN(B)");
+ const list=render({items:[data],directoryComplete:true});expect(list).not.toContain("TOKEN(A)");expect(list).not.toContain("TOKEN(B)");expect(list).not.toContain("Available tokens");expect(list).not.toContain("Capabilities");
+});
+
+it("distinguishes disabled aggregation from missing capability declarations",()=>{
+ const disabled=render({...record,observation:{...record.observation,service:{...record.observation.service,feeLock:{core:true},provenance:{aggregateSupported:false}}}},true);
+ expect(disabled).toContain("Automatic relay aggregation</dt><dd>Not enabled");
+ expect(disabled).toContain("Preparation price lock</dt><dd>Supported");
+ const unknown=render(record,true);
+ expect(unknown).toContain("Automatic relay aggregation</dt><dd>Not provided");
 });

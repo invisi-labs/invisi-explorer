@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add browser-local display settings for language, device/UTC/custom time zones and relative/full timestamps, with preview and reset. Keep API values unchanged and preserve time-zone context in time tooltips.
+- Unify the ecosystem footer with the InvisiPay website and use compact, accessible mobile navigation. Move source recognition into transaction details, simplify the relay list and clarify relay capabilities.
+
 - Simplify mobile branding and add localized, accessible terminology help for source recognition, private Notes, execution roles and finality.
 
 ## 1.3.7

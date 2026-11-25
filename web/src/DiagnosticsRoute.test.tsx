@@ -36,7 +36,7 @@ it("keeps diagnostics separate from transaction search and pagination", () => {
 it("offers diagnostics through one navigation entry without a duplicate footer dialog", () => {
   const html = renderToStaticMarkup(application);
   expect(html.match(/href="\/diagnostics"/g)).toHaveLength(1);
-  const footer = html.match(/<footer>([\s\S]*?)<\/footer>/)?.[1];
+  const footer = html.match(/<footer\b[^>]*>([\s\S]*?)<\/footer>/)?.[1];
   expect(footer).toBeDefined();
   expect(footer).toContain("Invisi Labs");
   expect(footer).not.toContain("<button");

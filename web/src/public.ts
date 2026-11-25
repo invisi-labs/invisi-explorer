@@ -1,16 +1,5 @@
-export function fullTime(value: unknown): string {
-  let d: Date;
-  if (
-    typeof value === "number" ||
-    (typeof value === "string" && /^\d+$/.test(value))
-  ) {
-    const n = Number(value);
-    d = new Date(n < 1e12 ? n * 1000 : n);
-  } else d = new Date(String(value));
-  if (!Number.isFinite(d.getTime())) return "—";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
+import {fullTimestamp} from "./displayPreferences";
+export const fullTime = fullTimestamp;
 export function age(
   value: unknown,
   now: number,

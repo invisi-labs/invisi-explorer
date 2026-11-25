@@ -1,3 +1,7 @@
+import {SettingsPage,settingsLabel} from "./SettingsPage";
+import {displayTimeZone,readDisplayPreferences} from "./displayPreferences";
+import {useDisplayPreferenceUpdates} from "./useDisplayPreferenceUpdates";
+import { SiteFooter } from "./SiteFooter";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -23,6 +27,7 @@ import {
 import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
 import { BroadcastersPanel } from "./BroadcastersPanel";
+import { ResponsiveHeader } from "./ResponsiveHeader";
 import { AdvancedTools } from "./AdvancedTools";
 import { TermHelp } from "./TermHelp";
 import { CopyButton } from "./CopyButton";
@@ -304,7 +309,8 @@ function Listing({
 }) {
   const { t } = useContext(Context);
   const nav = useNavigate();
-  const [full, setFull] = useState(false);
+  const [overrideFull, setFull] = useState<boolean>();
+  const full=overrideFull??readDisplayPreferences().timeDisplay==="absolute";
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60000);
@@ -319,7 +325,7 @@ function Listing({
         <h2>{t(compact ? "recentActivity" : (type as Key))}</h2>
         <button
           className="plain mobile-time"
-          onClick={() => setFull((x) => !x)}
+          onClick={() => setFull(!full)}
         >
           {t(full ? "time" : "age")} ⇄
         </button>
@@ -329,11 +335,10 @@ function Listing({
           </small>
         )}
       </div>
-      <div className="mobile-table-help">
-        {["transactions","notes"].includes(type) && <span>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></span>}
-        {type === "notes" && <span>{t("noteCommitmentLabel")}<TermHelp term="noteCommitmentLabel" label={t("noteCommitmentLabel")} t={t}/></span>}
+      {["notes","nullifiers"].includes(type) && <div className="mobile-table-help">
+        {type === "notes" && <><span>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></span><span>{t("noteCommitmentLabel")}<TermHelp term="noteCommitmentLabel" label={t("noteCommitmentLabel")} t={t}/></span></>}
         {type === "nullifiers" && <span>Nullifier<TermHelp term="nullifier" label="Nullifier" t={t}/></span>}
-      </div>
+      </div>}
       {result.notice && <p className="pagination-message" role="status">{t(result.notice === "updated" ? "paginationUpdated" : "paginationRestarted")}</p>}
       {result.error && result.data && <div className="pagination-message" role="alert">
         <span>{t(result.error.code === "CONFLICT" ? "paginationChanging" : "unavailable")}</span>
@@ -355,13 +360,12 @@ function Listing({
                     <th>{t("transactionTypeLabel")}</th>
                     <th>{t("execution")}</th>
                     <th>{t("amount")}</th>
-                    <th>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></th>
                   </>
                 )}
                 {type === "grants" && <><th>{t("token")}</th><th>{t("creditGrantStatus")}</th><th>{t("grantHistoryCount")}</th></>}
                 {type === "notes" && <><th>{t("noteGenerationMethod")}</th><th title={t("notePublicAmountHint")}>{t("notePublicAmount")}</th><th>{t("recognition")}<TermHelp term="recognition" label={t("recognition")} t={t}/></th></>}
                 <th>
-                  <button className="plain" onClick={() => setFull((x) => !x)}>
+                  <button className="plain" onClick={() => setFull(!full)}>
                     {t(full ? "time" : "age")} ⇄
                   </button>
                 </th>
@@ -415,12 +419,6 @@ function Listing({
                             amount={(value,token)=><Amount value={value} data={{...r,tokenAddress:token}} compact/>}
                             fallback={principal(r)!==undefined?<Amount value={principal(r)} data={r} compact/>:"—"}/>
                         </td>
-                        <td
-                          className="recognition-cell"
-                          data-label={t("recognition")}
-                        >
-                          <RecognitionBadges data={r} />
-                        </td>
                       </>
                     )}
                     {type === "grants" && <>
@@ -446,7 +444,7 @@ function Listing({
                       title={
                         fullTime(r.timestamp) +
                         " · " +
-                        Intl.DateTimeFormat().resolvedOptions().timeZone
+                        displayTimeZone()
                       }
                     >
                       {full ? fullTime(r.timestamp) : age(r.timestamp, now, t)}
@@ -708,7 +706,7 @@ function Detail({ type, id }: { type: string; id: string }) {
           <State {...result} />
         </section>
       ) : (
-        <div className={showRecognition ? "detail-grid" : "detail-grid detail-grid-single"}>
+        <div className={showRecognition && type !== "transactions" ? "detail-grid" : "detail-grid detail-grid-single"}>
           <div>
             {data?.indexAnomaly && (
               <section className="card">
@@ -726,7 +724,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                   {aggregate ? t("operationNumber").replace("{number}",String(BigInt(op.operationIndex ?? i)+1n)) + " · " + (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind) : t("publicInfo")}
                 </h2>
                 <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={!aggregate} />
-                {aggregate && <SourceRecognition data={op} t={t} status={value=><Status value={value}/>}/>}
+                {(aggregate || (type === "transactions" && showRecognition)) && <SourceRecognition data={aggregate ? op : data ?? op} t={t} status={value=><Status value={value}/>}/>}
                 {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={aggregate} t={t}
                   address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}
                   amount={(value, token) => <Amount value={value} data={{...op, tokenAddress:token}}/>}
@@ -851,7 +849,7 @@ function Detail({ type, id }: { type: string; id: string }) {
               </details>
             </section>
           </div>
-          {showRecognition && <aside>
+          {showRecognition && type !== "transactions" && <aside>
             <SourceRecognition data={data ?? {}} t={t} status={value=><Status value={value}/>} aside/>
           </aside>}
         </div>
@@ -882,71 +880,6 @@ function TransactionsPage() {
     </>
   );
 }
-const languageOptions: { value: Language; label: string; detail: string }[] = [
-  { value: "zh-Hans", label: "简体中文", detail: "Simplified Chinese" },
-  { value: "zh-Hant", label: "繁體中文", detail: "Traditional Chinese" },
-  { value: "en", label: "English", detail: "英语" },
-];
-function LanguagePicker({ language, onChange, label }: {
-  language: Language; onChange: (value: Language) => void; label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    root.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
-    const outside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setOpen(false); trigger.current?.focus(); }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-  return <div className="language-picker" ref={root} onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
-  }}>
-    <button className="language-trigger" ref={trigger} aria-label={label}
-      aria-haspopup="menu" aria-expanded={open} aria-controls="language-menu"
-      onClick={() => setOpen(!open)}
-      onKeyDown={(event) => {
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault(); setOpen(true);
-        }
-      }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c-5 5-5 13 0 18 5-5 5-13 0-18Z" />
-      </svg>
-      <span>{languageOptions.find(item => item.value === language)?.label}</span>
-      <svg className="language-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-    </button>
-    {open && <div className="language-menu" id="language-menu" role="menu" aria-label={label}
-      onKeyDown={(event) => {
-        const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-        const index = items.indexOf(document.activeElement as HTMLButtonElement);
-        let next = index;
-        if (event.key === "ArrowDown") next = (index + 1) % items.length;
-        else if (event.key === "ArrowUp") next = (index - 1 + items.length) % items.length;
-        else if (event.key === "Home") next = 0;
-        else if (event.key === "End") next = items.length - 1;
-        else return;
-        event.preventDefault(); items[next]?.focus();
-      }}>
-      {languageOptions.map(item => <button key={item.value} role="menuitemradio"
-        aria-checked={language === item.value} data-language={item.value}
-        onClick={() => { onChange(item.value); setOpen(false); trigger.current?.focus(); }}>
-        <span><span className="language-name">{item.label}</span><small>{item.detail}</small></span>
-        {language === item.value && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>}
-      </button>)}
-    </div>}
-  </div>;
-}
 function BroadcasterPresentation({data,detail=false}:{data:RecordData;detail?:boolean}) {
  const {t}=useContext(Context);
  return <BroadcastersPanel data={data} detail={detail} t={t} network={row=><Network data={row}/>}
@@ -974,6 +907,7 @@ function BroadcasterDetail({id}:{id:string}) {
  </>;
 }
 function App() {
+  useDisplayPreferenceUpdates();
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const metadata = useData<RecordData>("/metadata", 30000);
   const location = useLocation();
@@ -987,17 +921,16 @@ function App() {
   }, [language]);
   return (
     <Context.Provider value={{ t, metadata: metadata.data ?? {}, metadataPending: !metadata.data }}>
-      <header>
-        <div className="nav">
-          <Link className="brand" to="/" aria-label="InvisiPay · Explorer">
+      <ResponsiveHeader navigationLabel={t("all")} openLabel={t("openNavigation")} closeLabel={t("closeNavigation")}
+        brand={<Link className="brand" to="/" aria-label="InvisiPay · Explorer">
             <img className="brand-mark" src="/assets/invisipay-mark.svg" alt="" width="32" height="32" />
             <span className="brand-name">Invisi<span className="brand-pay">Pay</span></span>
             <span className="brand-product">Explorer</span>
-          </Link>
-          <LanguagePicker language={language} onChange={setLanguage} label={t("language")} />
-        </div>
-        <nav aria-label={t("all")}>
-          {routes.filter(r=>!["credit-states","nullifiers","trees","roots"].includes(r)).map((r) => (
+          </Link>}
+        actions={<Link className="settings-link" to="/settings" aria-label={settingsLabel(language)} title={settingsLabel(language)}>
+         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m9.5 3-.6 2.1-2 .9-2-.5-2.5 4.3 1.5 1.6v2.2l-1.5 1.6 2.5 4.3 2-.5 2 .9.6 2.1h5l.6-2.1 2-.9 2 .5 2.5-4.3-1.5-1.6v-2.2l1.5-1.6-2.5-4.3-2 .5-2-.9L14.5 3Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </Link>}>
+        {routes.filter(r=>!["credit-states","nullifiers","trees","roots"].includes(r)).map((r) => (
             <Link
               key={r}
               to={r === "transactions" ? "/" : "/" + r}
@@ -1007,10 +940,9 @@ function App() {
             </Link>
           ))}
           <AdvancedTools t={t}/>
-        </nav>
-      </header>
+      </ResponsiveHeader>
       <main>
-        {type === "transactions" && !id ? (
+        {type === "settings" ? (<SettingsPage language={language} onLanguageChange={setLanguage} defaultLanguage={initialLanguage}/>) : type === "transactions" && !id ? (
           <Navigate to={{ pathname: "/", search: location.search, hash: location.hash }} replace />
         ) : !type ? (
           <TransactionsPage />
@@ -1042,12 +974,7 @@ function App() {
           <State error={{ code: "NOT_INDEXED", status: 404 }} />
         )}
       </main>
-      <footer>
-        <span>Invisi Labs</span>
-        <span>
-          {t("timezone")}: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-        </span>
-      </footer>
+      <SiteFooter language={language} />
     </Context.Provider>
   );
 }

@@ -16,38 +16,25 @@ export function broadcasterState(row:Row):Key {
  if(observation.stale && observation.checkedAt)return "bcStale";
  return ({available:"bcOnline",halted:"bcPaused",identity_mismatch:"bcMismatch",invalid_endpoint:"bcInvalidEndpoint",unavailable:"bcUnreachable",not_probed:"bcNotProbed"} as Record<string,Key>)[observation.status] ?? "bcNotProbed";
 }
-function capabilities(service:Row|undefined):Key[] {
- if(!service)return [];
- const result:Key[]=[];
- if(service.scheduling?.enabled)result.push("bcScheduling");
- if(service.paymentRouters?.length)result.push("bcRouter");
- if(service.provenance?.enabled)result.push("bcScreening");
- if(service.provenance?.aggregateSupported)result.push("bcAggregation");
- if(service.feeLock?.core)result.push("bcFeeLock");
- return result;
-}
 function tokenAvailable(token:Row):boolean {
  return token.supported===true && (!token.priceValidUntil || Date.parse(token.priceValidUntil)>Date.now());
 }
 const time=(value:unknown)=>value?fullTime(String(value)):"—";
 export function BroadcastersPanel({data,t,network,token,address,href,detail=false}:Props) {
  const rows:Row[]=detail ? data.occurrences ?? [data] : data.items ?? [];
- const yesNo=(value:unknown)=>t(value===true?"bcSupported":value===false?"bcUnsupported":"bcNotProvided");
+ const yesNo=(value:unknown)=>t(value===true?"bcSupported":value===false?"bcNotEnabled":"bcNotProvided");
  return <>
   <p className="muted">{t("bcDescription")}</p>
   {data.directoryComplete===false && <p className="pagination-message" role="status">{t("bcDirectoryPending")}</p>}
   {!detail ? <section className="card"><div className="table-wrap"><table className="public-list broadcasters-table">
-   <thead><tr>{(["bcService","network","bcRegistration","bcRuntime","bcAvailableTokens","bcCapabilities","bcLastCheck"] as Key[]).map(key=><th key={key}>{t(key)}</th>)}</tr></thead>
+   <thead><tr>{(["bcService","network","bcRegistration","bcRuntime","bcLastCheck"] as Key[]).map(key=><th key={key}>{t(key)}</th>)}</tr></thead>
    <tbody>{rows.map((row,i)=>{
-    const observation=row.observation ?? {};const state=broadcasterState(row);const tokens:Row[]=observation.tokens ?? [];
-    const available=tokens.filter(tokenAvailable);
+    const observation=row.observation ?? {};const state=broadcasterState(row);
     return <tr key={`${row.chainId}:${row.protocolAddress}:${row.operator}:${i}`}>
      <td data-label={t("bcService")}><Link to={href(row)}>{broadcasterName(row.endpoint)}</Link><small className="muted"><code title={row.operator}>{String(row.operator).slice(0,8)}…{String(row.operator).slice(-6)}</code></small></td>
      <td data-label={t("network")}>{network(row)}</td>
      <td data-label={t("bcRegistration")}><span className={"badge "+(row.enabled?"good":"")}>{t(row.enabled?"bcEnabled":"bcDisabled")}</span></td>
-     <td data-label={t("bcRuntime")}><span className={"badge "+(state==="bcOnline"?"good":"")}>{t(state)}</span>{observation.checkedAt>0 && <small className="muted">{observation.responseMillis} ms</small>}</td>
-     <td data-label={t("bcAvailableTokens")}>{!row.enabled?"—":observation.stale?t("bcStale"):observation.tokensStatus==="complete" ? available.length?available.map(item=><div key={item.tokenAddress}>{token(item.tokenAddress,row)}</div>):t("bcNoAvailableTokens"):t(observation.tokensStatus==="not_provided"?"bcNotProvided":"bcQueryUnavailable")}</td>
-     <td data-label={t("bcCapabilities")}><div className="bc-capabilities">{observation.stale?t("bcStale"):capabilities(observation.service).map(key=><span key={key}>{t(key)}</span>)}</div></td>
+     <td data-label={t("bcRuntime")}><span className="bc-runtime"><span className={"badge "+(state==="bcOnline"?"good":"")}>{t(state)}</span>{observation.checkedAt>0 && <span className="muted">· {observation.responseMillis} ms</span>}</span></td>
      <td data-label={t("bcLastCheck")}>{time(observation.checkedAt)}</td>
     </tr>;
    })}</tbody>
@@ -84,7 +71,7 @@ export function BroadcastersPanel({data,t,network,token,address,href,detail=fals
      {observation.tokensStatus==="complete" ? <div className="table-wrap"><table className="funding-table"><thead><tr><th>{t("token")}</th><th>{t("bcAvailability")}</th><th>{t("bcPriceExpiry")}</th></tr></thead><tbody>{tokens.map(item=><tr key={item.tokenAddress}>
       <td data-label={t("token")}>{token(item.tokenAddress,row)}</td>
       <td data-label={t("bcAvailability")}>{t(observation.stale?"bcStale":item.status==="paused"?"bcPaused":tokenAvailable(item)?"bcAvailable":"bcPricingUnavailable")}</td>
-      <td data-label={t("bcPriceExpiry")}>{item.priceValidUntil?new Date(item.priceValidUntil).toLocaleString():"—"}</td>
+      <td data-label={t("bcPriceExpiry")}>{item.priceValidUntil?fullTime(item.priceValidUntil):"—"}</td>
      </tr>)}</tbody></table>{!tokens.length&&<p>{t("bcNoConfiguredTokens")}</p>}</div>:<p className="muted">{t(observation.tokensStatus==="not_provided"?"bcLegacyTokens":"bcQueryUnavailable")}</p>}
     </section>
     <details className="card bc-technical"><summary>{t("bcTechnical")}</summary><p className="muted">{t("bcRegistrySource")}</p><dl className="public-fields">
