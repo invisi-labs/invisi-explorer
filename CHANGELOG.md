@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show input Nullifiers in a responsive table matching output Note commitments, retaining per-row copying and scoped detail links.
+
 - Use consistent input-nullifier and output-Note-commitment terminology. Separate outer transaction execution from per-operation public funding for both single and aggregate transactions.
 
 - Present Broadcaster details as a service with network and Core deployment selection. Preserve URL defaults and independent observations, capability declarations and token policies for each registration.

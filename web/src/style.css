@@ -588,3 +588,5 @@ footer.site-footer { display: block; max-width: none; margin: 48px 0 0; padding:
 .bc-deployment-select > svg { position:absolute; right:14px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--secondary); }
 .bc-deployment-select > select:focus-visible { outline:2px solid var(--purple); outline-offset:2px; }
 .bc-deployment-value { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-height:32px; overflow-wrap:anywhere; min-width:0; }
+
+.note-inputs-table th:first-child { width:100%; }
