@@ -36,6 +36,7 @@ type recognitionFixture struct {
 	wrongIdentity  atomic.Bool
 	rollbackOnRead atomic.Bool
 	calls          atomic.Int64
+	pollTime       time.Time
 }
 
 func newRecognitionFixture(t *testing.T, state string) *recognitionFixture {
@@ -94,11 +95,14 @@ func newRecognitionFixture(t *testing.T, state string) *recognitionFixture {
 	}))
 	f.chain = config.Chain{ChainID: f.scope.ChainID, ProtocolAddress: f.scope.ProtocolAddress, ProvenanceURL: f.server.URL, IssuerID: "issuer"}
 	f.syncer = &Syncer{Store: f.store, Client: f.server.Client()}
+	f.pollTime = time.Now()
+	f.syncer.provenanceReads.now = func() time.Time { return f.pollTime }
 	t.Cleanup(func() { f.server.Close(); f.store.Close() })
 	f.refresh()
 	return f
 }
 func (f *recognitionFixture) refresh() {
+	f.pollTime = f.pollTime.Add(5 * time.Second)
 	f.t.Helper()
 	if err := f.syncer.SyncRoots(context.Background(), f.chain); err != nil {
 		f.t.Fatal(err)
@@ -108,6 +112,7 @@ func (f *recognitionFixture) refresh() {
 	}
 }
 func (f *recognitionFixture) age() {
+	f.pollTime = f.pollTime.Add(time.Hour)
 	f.t.Helper()
 	if _, err := f.store.DB.Exec("UPDATE remote_recognition SET updated_at=?", time.Now().Unix()-3600); err != nil {
 		f.t.Fatal(err)
@@ -449,9 +454,11 @@ func TestFailedRecognitionDoesNotStarveLaterPendingRows(t *testing.T) {
 			}))
 			defer server.Close()
 			f.syncer.Client = &http.Client{Transport: rewriteRecognitionTransport{target: server.URL, base: server.Client().Transport}}
-			_ = f.syncer.HydrateRecognition(context.Background(), f.chain)
-			if err = f.syncer.HydrateRecognition(context.Background(), f.chain); err != nil {
-				t.Fatal("failed row monopolized another pass:", err)
+			// Hydration now yields to the shared quota. Advance several poll
+			// intervals without aging failed attempts back into the due queue.
+			for pass := 0; pass < 8; pass++ {
+				f.pollTime = f.pollTime.Add(5 * time.Second)
+				_ = f.syncer.HydrateRecognition(context.Background(), f.chain)
 			}
 			value, err := f.syncer.Recognition(context.Background(), f.chain, known)
 			if err != nil || !strings.Contains(mustJSON(value), `"status":"recognized"`) {

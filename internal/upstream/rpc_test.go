@@ -36,3 +36,25 @@ func TestRPCPreservesOnlyBoundNumericBusinessError(t *testing.T) {
 		t.Fatalf("exposed upstream message %v", err)
 	}
 }
+
+func TestRPCBoundedRateLimitDelay(t *testing.T) {
+	for _, tc := range []struct {
+		header string
+		want   int
+	}{{"7", 7}, {"", 60}, {"0", 60}, {"-1", 60}, {"3601", 60}, {"PRIVATE", 60}} {
+		t.Run(tc.header, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Retry-After", tc.header)
+				w.WriteHeader(429)
+				w.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32013,"message":"PRIVATE"}}`))
+			}))
+			defer server.Close()
+			var out any
+			err := Call(context.Background(), server.Client(), server.URL, "test", []any{}, &out)
+			var rpc *RPCError
+			if !errors.As(err, &rpc) || rpc.RetryAfter != tc.want {
+				t.Fatalf("unbounded retry delay: %+v", rpc)
+			}
+		})
+	}
+}

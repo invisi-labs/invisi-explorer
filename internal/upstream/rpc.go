@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -19,6 +20,7 @@ const MaxResponseBytes = 8 << 20
 type RPCError struct {
 	Code       int
 	HTTPStatus int
+	RetryAfter int
 }
 
 func (e *RPCError) Error() string { return "upstream RPC rejected" }
@@ -66,7 +68,11 @@ func Call(ctx context.Context, c *http.Client, url, method string, params any, o
 		if len(env.Result) > 0 || json.Unmarshal(env.Error, &classification) != nil || classification.Code == nil {
 			return errors.New("upstream RPC rejected")
 		}
-		return &RPCError{Code: *classification.Code, HTTPStatus: r.StatusCode}
+		retry, _ := strconv.Atoi(r.Header.Get("Retry-After"))
+		if retry < 1 || retry > 3600 {
+			retry = 60
+		}
+		return &RPCError{Code: *classification.Code, HTTPStatus: r.StatusCode, RetryAfter: retry}
 	}
 	if r.StatusCode != http.StatusOK {
 		return errors.New("upstream HTTP error")

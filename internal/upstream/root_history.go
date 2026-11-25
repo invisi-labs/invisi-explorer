@@ -57,7 +57,7 @@ func (s *Syncer) syncHistoricalRoots(ctx context.Context, c config.Chain, curren
 		Items      []wire.Certificate `json:"items"`
 		NextCursor string             `json:"nextCursor"`
 	}
-	if e = Call(ctx, s.Client, c.ProvenanceURL, "provenance_getRoots", []any{map[string]any{"generation": generation, "after": after, "limit": 200}}, &page); e != nil {
+	if e = s.callProvenance(ctx, c.ProvenanceURL, "provenance_getRoots", []any{map[string]any{"generation": generation, "after": after, "limit": 200}}, &page); e != nil {
 		return e
 	}
 	if len(page.Items) > 200 {

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.3.9
+
+- Prevent pending recognition refreshes from exhausting Provenance's shared read quota and intermittently disabling root lists. Share a bounded read budget across chain paths on the same upstream origin, reserve capacity for root synchronization, and respect rate-limit cooldowns without delaying public reads.
+- Record sanitized root-sync error classifications for diagnostics while retaining existing generation, reorg and recognized-result fences.
+
 ## 1.3.8
 
 - Make Home network cards direct protocol-contract entry points with address copying and internal/external links. Hide normal sync status and deployment counts; show a warning only for observed synchronization failures.

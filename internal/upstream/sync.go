@@ -18,9 +18,10 @@ import (
 var ErrCaughtUp = errors.New("caught up")
 
 type Syncer struct {
-	transactions transactionCache
-	Store        *readmodel.Store
-	Client       *http.Client
+	provenanceReads provenanceQuota
+	transactions    transactionCache
+	Store           *readmodel.Store
+	Client          *http.Client
 }
 type Block struct {
 	Number     uint64 `json:"number"`

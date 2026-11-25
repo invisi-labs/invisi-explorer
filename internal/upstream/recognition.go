@@ -158,12 +158,15 @@ func (s *Syncer) HydrateRecognition(ctx context.Context, c config.Chain) error {
 		return e
 	}
 	for _, op := range ops {
+		if s.provenanceReads.acquire(c.ProvenanceURL, true, s.provenanceReads.clock()) > 0 {
+			return nil
+		}
 		if e = s.Store.RecordRecognitionAttempt(ctx, op, binding, time.Now().Unix()); e != nil {
 			return e
 		}
 		requestCtx, stop := context.WithTimeout(ctx, 2*time.Second)
 		var r map[string]any
-		e = Call(requestCtx, s.Client, c.ProvenanceURL, "provenance_getOperationRecognition", []any{map[string]any{"blockHash": op.BlockHash, "txHash": op.TxHash, "operationIndex": op.OperationIndex}}, &r)
+		e = s.provenanceRPC(requestCtx, c.ProvenanceURL, "provenance_getOperationRecognition", []any{map[string]any{"blockHash": op.BlockHash, "txHash": op.TxHash, "operationIndex": op.OperationIndex}}, &r)
 		stop()
 		if e != nil {
 			var business *RPCError
@@ -220,7 +223,24 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 		if returnErr != nil {
 			state = "unavailable"
 		}
-		_ = s.Store.SourceStatus(context.WithoutCancel(ctx), Scope(c), "provenance", state, nil)
+		var observation any
+		if returnErr != nil {
+			reason := "SYNC_FAILED"
+			fields := map[string]any{}
+			var rpc *RPCError
+			if errors.As(returnErr, &rpc) {
+				fields["httpStatus"], fields["rpcCode"] = rpc.HTTPStatus, rpc.Code
+				if rpc.HTTPStatus == 429 || rpc.Code == -32013 {
+					reason = "RATE_LIMITED"
+				}
+			}
+			if errors.Is(returnErr, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded {
+				reason = "TIMEOUT"
+			}
+			fields["reason"] = reason
+			observation = fields
+		}
+		_ = s.Store.SourceStatus(context.WithoutCancel(ctx), Scope(c), "provenance", state, observation)
 	}()
 
 	if c.ProvenanceURL == "" {
@@ -240,7 +260,7 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 		Generation string     `json:"chainGeneration"`
 		Sequence   string     `json:"checkpointSequence"`
 	}
-	if e := Call(ctx, s.Client, c.ProvenanceURL, "provenance_getStatus", []any{}, &status); e != nil {
+	if e := s.callProvenance(ctx, c.ProvenanceURL, "provenance_getStatus", []any{}, &status); e != nil {
 		return e
 	}
 	if status.Scope.Key() != scope.Key() || status.ProviderID == "" || c.IssuerID != "" && status.ProviderID != c.IssuerID {
@@ -269,7 +289,7 @@ func (s *Syncer) SyncRoots(ctx context.Context, c config.Chain) (returnErr error
 		Items      []wire.Certificate `json:"items"`
 		NextCursor string             `json:"nextCursor"`
 	}
-	if e := Call(ctx, s.Client, c.ProvenanceURL, "provenance_getRoots", []any{map[string]any{"limit": 200, "after": start, "generation": status.Generation}}, &page); e != nil {
+	if e := s.callProvenance(ctx, c.ProvenanceURL, "provenance_getRoots", []any{map[string]any{"limit": 200, "after": start, "generation": status.Generation}}, &page); e != nil {
 		return e
 	}
 	if len(page.Items) > 200 {
