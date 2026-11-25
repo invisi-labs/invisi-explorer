@@ -5,6 +5,7 @@ import type { Key } from "./i18n";
 
 type Props = {
   operation: Record<string, unknown>;
+  hideTransaction?: boolean;
   t: (key: Key) => string;
   address: (value: string, kind?: "address" | "token") => ReactNode;
   amount: (value: string, token: string) => ReactNode;
@@ -25,7 +26,7 @@ const warningKeys: Record<string, Key> = {
   "context-conflict": "fundingInvalid",
 };
 
-export function FundingPanel({ operation, t, address, amount }: Props) {
+export function FundingPanel({ operation, t, address, amount, hideTransaction = false }: Props) {
   const view = fundingView(operation);
   const [expanded, setExpanded] = useState(false);
   const transfers = expanded ? view.transfers : view.transfers.slice(0, 12);
@@ -34,9 +35,9 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
   const asset = (token: string) =>
     token.toLowerCase() === zero ? t("fundingNative") : address(token, "token");
   return (
-    <section className="funding-panel" aria-label={t("fundingTitle")}>
-      <h3>{t("fundingTitle")}</h3>
-      <p className="muted">{t("fundingGeneric")}</p>
+    <section className="funding-panel" aria-label={t(hideTransaction ? "fundingOnlyTitle" : "fundingTitle")}>
+      <h3>{t(hideTransaction ? "fundingOnlyTitle" : "fundingTitle")}</h3>
+      <p className="muted">{t(view.privateNoteInputs ? "fundingPrivateInputs" : "fundingGeneric")}</p>
       {view.warnings.length > 0 && (
         <ul className="funding-notices">
           {[
@@ -61,7 +62,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
       {view.execution !== "executed" || !view.rolesConfirmed ? null : (
         <>
           <dl className="funding-roles">
-            <dt>{t("fundingSources")}</dt>
+            {!view.privateNoteInputs && <><dt>{t("fundingSources")}</dt>
             <dd>
               {view.sourceCandidates.length ? (
                 view.sourceCandidates.map((source) => (
@@ -78,6 +79,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
                 <span className="muted">{t("fundingSourceUnknown")}</span>
               )}
             </dd>
+            </>}
             <dt>{t("fundingCorePayers")}</dt>
             <dd>
               {view.coreFunding.length
@@ -110,7 +112,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
                 ? address(view.calls[view.calls.length - 1].from, "address")
                 : view.directCoreCall ? t("fundingDirectCore") : t("fundingUnknown")}
             </dd>
-            <dt>{t("fundingSubmitter")}</dt>
+            {!hideTransaction && <><dt>{t("fundingSubmitter")}</dt>
             <dd>
               {view.submitter
                 ? address(view.submitter, "address")
@@ -119,6 +121,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
             </dd>
             <dt>{t("fundingTransactionTo")}</dt>
             <dd>{view.transactionTo ? address(view.transactionTo, "address") : t("fundingUnknown")}</dd>
+            </>}
             {typeof operation.feeRecipient === "string" &&
               operation.feeRecipient !== zero &&
               typeof operation.feeAmount === "string" &&
@@ -128,7 +131,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
                   <dd>{address(operation.feeRecipient, "address")}</dd>
                 </>
               )}
-            <dt>{t("fundingExecution")}</dt>
+            {!hideTransaction && <><dt>{t("fundingExecution")}</dt>
             <dd>
               {view.is7702Transaction ? (
                 <strong>EIP-7702 · {t("fundingType")} 4</strong>
@@ -137,6 +140,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
               ) : t("funding7702Unknown")}
               {view.is7702Transaction && <p className="muted">{t("fundingAuthorizationCaveat")}</p>}
             </dd>
+            </>}
           </dl>
           {view.transfers.length > 0 && (
             <div className="funding-flow">
@@ -212,7 +216,7 @@ export function FundingPanel({ operation, t, address, amount }: Props) {
               </ol>
             </details>
           )}
-          {view.authorizations.length > 0 && (
+          {!hideTransaction && view.authorizations.length > 0 && (
             <details className="funding-calls">
               <summary>{t("fundingAuthorizations")}</summary>
               <p className="muted">{t("fundingAuthorizationCaveat")}</p>

@@ -97,3 +97,36 @@ describe("public funding panel", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 });
+
+const privateOperation = {
+ kind:"transact",canonical:true,success:true,chainId:"97",protocolAddress:core,
+ txHash:"0x"+"a".repeat(64),blockHash:"0x"+"b".repeat(64),blockNumber:"42",
+ funding:[],withdrawalAmount:"0",feeAmount:"0",
+ noteNullifiers:["0x"+"c".repeat(64)],noteOutputs:[{noteCommitment:"0x"+"d".repeat(64)}],
+ transactionObservation:{chainId:"97",protocolAddress:core,txHash:"0x"+"a".repeat(64),blockHash:"0x"+"b".repeat(64),blockNumber:"42",transactionSender:relay,transactionTo:core,transactionType:"0"},
+};
+const renderFunding=(op:Record<string,unknown>,hideTransaction=false)=>renderToStaticMarkup(<FundingPanel operation={op} hideTransaction={hideTransaction} t={k=>dictionaries.en[k]} address={v=><code>{v}</code>} amount={v=><span>{v}</span>}/>);
+it("explains private Note funding without implying missing public trace or naming owners",()=>{
+ const html=renderFunding(privateOperation);
+ expect(html).toContain("Uses private Note inputs");
+ expect(html).not.toContain(dictionaries.en.fundingUnavailable);
+ expect(html).not.toContain(dictionaries.en.fundingSourceUnknown);
+ expect(html).toContain(dictionaries.en.fundingNoDeposit);
+ expect(html).toContain(dictionaries.en.fundingNoWithdrawal);
+});
+it("keeps missing-trace warnings for public funding and incomplete or unsupported records",()=>{
+ for(const patch of [{funding:[{payer:player,tokenAddress:core,amount:"1"}]},{funding:undefined},{unsupportedReason:"UNSUPPORTED"},{noteNullifiers:[]},{noteOutputs:[{amount:"7"}]},{noteOutputs:[{}]},{success:false},{canonical:false}]){
+  const html=renderFunding({...privateOperation,...patch});
+  expect(html).toContain(dictionaries.en.fundingUnavailable);
+  expect(html).not.toContain("Uses private Note inputs");
+ }
+});
+it("keeps operation funding but omits outer transaction fields when grouped",()=>{
+ const html=renderFunding(operation,true);
+ expect(html).not.toContain(dictionaries.en.fundingSubmitter);
+ expect(html).not.toContain(dictionaries.en.fundingTransactionTo);
+ expect(html).not.toContain(dictionaries.en.fundingExecution);
+ expect(html).toContain(dictionaries.en.fundingCorePayers);
+ expect(html).toContain("100200000");
+ expect(html).toContain(dictionaries.en.fundingCaller);
+});

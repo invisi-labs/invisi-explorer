@@ -32,6 +32,8 @@ import { CreditOperationPanel } from "./CreditOperationPanel";
 import { GrantHistory } from "./GrantHistory";
 import { grantStatusKey, compactIdentifier, isCreditOperation } from "./credit";
 import { FundingPanel } from "./FundingPanel";
+import { TransactionExecutionPanel } from "./TransactionExecutionPanel";
+import { OperationNoteInputs } from "./OperationNoteInputs";
 import { SourceRecognition } from "./SourceRecognition";
 import { NoteGenerationLabel, TransactionOperationLabel, TransactionAmounts } from "./TransactionPresentation";
 import { NetworkIcon } from "./NetworkIcon";
@@ -556,7 +558,7 @@ function Search() {
     </section>
   );
 }
-function PublicFields({ data, showSourceTransaction = true, showNoteAmount = false }: { data: RecordData; showSourceTransaction?: boolean; showNoteAmount?: boolean }) {
+function PublicFields({ data, showSourceTransaction = true, showNoteAmount = false, showProtocol = true }: { data: RecordData; showSourceTransaction?: boolean; showNoteAmount?: boolean; showProtocol?: boolean }) {
   const { t } = useContext(Context);
   const known: [string, Key][] = [
     ["kind", "operation"],
@@ -609,7 +611,7 @@ function PublicFields({ data, showSourceTransaction = true, showNoteAmount = fal
           </dd>
         </>
       )}
-      {data.protocolAddress && (
+      {showProtocol && data.protocolAddress && (
         <>
           <dt>{t("protocol")}</dt>
           <dd>
@@ -710,14 +712,16 @@ function Detail({ type, id }: { type: string; id: string }) {
                 />
               </section>
             )}
+            {aggregate && <TransactionExecutionPanel operations={operations} t={t}
+              address={(value, kind) => <Address value={value} kind={kind} data={operations[0]}/>}/>}
             {operations.map((op: RecordData, i: number) => (
               <section className="card" key={i}>
                 <h2>
                   {aggregate ? t("operationNumber").replace("{number}",String(BigInt(op.operationIndex ?? i)+1n)) + " · " + (op.kind in dictionaries.en ? t(op.kind as Key) : op.kind) : t("publicInfo")}
                 </h2>
-                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} />
+                <PublicFields data={op} showSourceTransaction={type !== "transactions"} showNoteAmount={type === "notes"} showProtocol={!aggregate} />
                 {aggregate && <SourceRecognition data={op} t={t} status={value=><Status value={value}/>}/>}
-                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} t={t}
+                {isCreditOperation(op.kind) && <CreditOperationPanel operation={op} hideTransaction={aggregate} t={t}
                   address={(value, kind) => <Address value={value} kind={kind ?? "address"} data={op}/>}
                   amount={(value, token) => <Amount value={value} data={{...op, tokenAddress:token}}/>}
                   href={(collection, value) => objectHref(collection,op,value)}/>}
@@ -728,6 +732,7 @@ function Detail({ type, id }: { type: string; id: string }) {
                   op.unsupportedReason) && (
                   <FundingPanel
                     operation={op}
+                    hideTransaction={aggregate}
                     t={t}
                     address={(value, kind) => (
                       <Address value={value} kind={kind} data={op} />
@@ -740,6 +745,8 @@ function Detail({ type, id }: { type: string; id: string }) {
                     )}
                   />
                 )}
+                {type === "transactions" && <OperationNoteInputs operation={op} t={t}
+                  reference={value => <Address value={value} data={op} internalHref={objectHref("nullifiers",op,value)+"&namespace=note"}/>}/>}
                 {op.noteOutputs?.length > 0 && (
                   <>
                     <h3>{t("noteOutputsCount").replace("{count}", String(op.noteOutputs.length))}</h3>

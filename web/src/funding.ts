@@ -73,6 +73,8 @@ export interface FundingView {
   warnings: FundingWarning[];
   execution: "executed" | "failed" | "orphaned" | "unknown";
   rolesConfirmed: boolean;
+  /** A successful private-only transfer with explicitly empty public funding. */
+  privateNoteInputs: boolean;
   /** Historical metadata retained without reconstructing absent trace facts. */
   legacy: Record<string, string> | null;
 }
@@ -316,6 +318,17 @@ export function fundingView(input: unknown): FundingView {
     if (!sourceCandidates.length) warnings.add("source-unresolved");
   }
   if (sourceCandidates.length) warnings.add("source-not-beneficial-owner");
+  const privateNoteInputs = rolesConfirmed && op.kind === "transact" && !op.unsupportedReason &&
+    Array.isArray(op.funding) && op.funding.length === 0 && op.withdrawalAmount === "0" &&
+    Array.isArray(op.noteNullifiers) && op.noteNullifiers.length > 0 &&
+    op.noteNullifiers.every(n => typeof n === "string" && /^0x[0-9a-f]{64}$/i.test(n) && !/^0x0{64}$/i.test(n)) &&
+    Array.isArray(op.noteOutputs) && op.noteOutputs.length > 0 &&
+    op.noteOutputs.every(n => {
+      const note = object(n);
+      return note.amount === undefined && typeof note.noteCommitment === "string" && /^0x[0-9a-f]{64}$/i.test(note.noteCommitment) && !/^0x0{64}$/i.test(note.noteCommitment);
+    }) &&
+    op.fundingEvidence == null && op.routerFunding == null;
+  if (privateNoteInputs) warnings.delete("evidence-unavailable");
   return {
     coreFunding,
     sourceCandidates,
@@ -338,6 +351,7 @@ export function fundingView(input: unknown): FundingView {
     warnings: [...warnings],
     execution,
     rolesConfirmed,
+    privateNoteInputs,
     legacy,
   };
 }

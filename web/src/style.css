@@ -361,8 +361,23 @@ footer { max-width: 1264px; margin: auto; padding: 20px 32px 28px; display: flex
 
 .credit-operation { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 12px; }
 .credit-operation h4 { margin: 24px 0 12px; }
-.credit-slot, .credit-payer { margin: 12px 0; padding: 16px; background: var(--surface); border-radius: 12px; }
-.credit-slot dl { margin-top: 0; }
+.credit-payer { margin: 12px 0; padding: 16px; background: var(--surface); border-radius: 12px; }
+.credit-slots { display: grid; gap: 12px; }
+.credit-slot { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.credit-slot > .public-fields { margin: 0; padding: 16px 20px; gap: 10px 20px; background: transparent; }
+.credit-slot > .public-fields dt { font-size: 12px; }
+.credit-slot-id { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 16px; }
+.credit-slot-id > code { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.credit-slot-link { display: inline-flex; align-items: center; gap: 4px; flex: none; min-height: 32px; padding: 4px 6px; border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.credit-slot-link:hover { background: var(--purple-soft); text-decoration: none; }
+.credit-slot-link:focus-visible { outline-offset: 1px; }
+.credit-slot-link svg { flex: none; }
+@media (max-width: 767px) {
+  .credit-slot > .public-fields { padding: 14px 16px; gap: 4px; }
+  .credit-slot > .public-fields dd { margin-bottom: 8px; }
+  .credit-slot > .public-fields dd:last-child { margin-bottom: 0; }
+  .credit-slot-link { min-height: 44px; }
+}
 .credit-outputs-table { table-layout: fixed; }
 .credit-outputs-table th:first-child { width: 68%; }
 .credit-outputs-table td:first-child a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -469,3 +484,8 @@ nav .advanced-tools-panel a { display: flex; border-radius: 8px; white-space: no
  .broadcasters-table tbody tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; border-bottom: 1px solid var(--line); padding: 16px 0; }
  .broadcasters-table td:first-child, .broadcasters-table td:nth-child(2), .broadcasters-table td:last-child { grid-column: 1 / -1; }
 }
+
+.note-inputs { margin-top: 20px; }
+.note-inputs ul { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 8px; }
+.note-inputs li { min-width: 0; }
+.transaction-execution .public-fields dd > .muted { margin: 6px 0 0; font-size: 12px; }

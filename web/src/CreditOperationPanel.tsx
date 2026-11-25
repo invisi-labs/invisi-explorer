@@ -8,6 +8,7 @@ import { CopyButton } from "./CopyButton";
 type RecordData = Record<string, any>;
 type Props = {
   operation: RecordData;
+  hideTransaction?: boolean;
   t: (key: Key) => string;
   address: (value: string, kind?: "address" | "token") => ReactNode;
   amount: (value: string, token: string) => ReactNode;
@@ -17,7 +18,7 @@ const descriptions: Record<string, Key> = {
   createCredit: "creditCreateDescription", updateCredit: "creditUpdateDescription",
   revokeCredit: "creditRevokeDescription", creditDraw: "creditDrawDescription",
 };
-export function CreditOperationPanel({operation: op, t, address, amount, href}: Props) {
+export function CreditOperationPanel({operation: op, t, address, amount, href, hideTransaction = false}: Props) {
   const view = fundingView(op);
   const settled = op.success === true && op.canonical === true && !op.unsupportedReason;
   const refs = creditGrantRefs(op);
@@ -30,16 +31,22 @@ export function CreditOperationPanel({operation: op, t, address, amount, href}: 
     <p className="muted">{t(descriptions[op.kind])}</p>
     {!settled && <p className="muted">{t("creditUnsettled")}</p>}
     <h4>{t("creditSlots")}</h4>
-    {refs.length ? refs.map((ref, i) => {
+    {refs.length ? <div className="credit-slots">{refs.map((ref, i) => {
       const id = creditSlotId(op, ref);
       return <div className="credit-slot" key={id ?? i}>
         <dl className="public-fields">
           <dt>{t("grantOwner")}</dt><dd>{ref.payer ? address(ref.payer) : t("fundingUnknown")}</dd>
-          <dt>{t("grantIdLabel")}</dt><dd><code>{ref.grantId}</code></dd>
+          <dt>{t("grantIdLabel")}</dt>
+          <dd className="credit-slot-id">
+            <code>{ref.grantId}</code>
+            {id && <Link className="credit-slot-link" to={href("grants", id)}>
+              {t("creditViewGrant")}
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+            </Link>}
+          </dd>
         </dl>
-        {id && <Link to={href("grants", id)}>{t("creditViewHistory")} ↗</Link>}
       </div>;
-    }) : <p className="muted">{t(settled ? "creditIndexPending" : "fundingUnknown")}</p>}
+    })}</div> : <p className="muted">{t(settled ? "creditIndexPending" : "fundingUnknown")}</p>}
     {["createCredit", "updateCredit"].includes(op.kind) && <p className="muted">{t("creditPrivatePolicy")}</p>}
     {settled && payment && <>
       <h4>{t(initial ? "creditInitialPayment" : "creditDrawFunding")}</h4>
@@ -54,7 +61,7 @@ export function CreditOperationPanel({operation: op, t, address, amount, href}: 
       <dt>{t("fee")}</dt><dd>{amount(op.feeAmount,op.tokenAddress)}</dd>
       {op.feeRecipient && !/^0x0{40}$/.test(op.feeRecipient) && <><dt>{t("fundingFeeRecipient")}</dt><dd>{address(op.feeRecipient)}</dd></>}
     </dl>}
-    {view.rolesConfirmed && <dl className="public-fields">
+    {!hideTransaction && view.rolesConfirmed && <dl className="public-fields">
       {view.submitter && <><dt>{t("fundingSubmitter")}</dt><dd>{address(view.submitter)}</dd></>}
       {view.transactionTo && <><dt>{t("fundingTransactionTo")}</dt><dd>{address(view.transactionTo)}</dd></>}
     </dl>}
