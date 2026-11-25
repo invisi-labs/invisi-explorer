@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a responsive search-type selector for transactions, addresses, Note and credit-state commitments, Nullifiers and Merkle roots, with type-scoped backend queries and updated placeholders.
+
 - Present Provenance availability as the result of the last verification request, avoiding false expiry warnings for idle services. Keep Explorer observation freshness separate.
 
 - Use consistent protocol terminology in public labels and help, and share a lighter violet-neutral palette for surfaces, table headings and summary panels.

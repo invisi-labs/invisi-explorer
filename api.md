@@ -21,7 +21,7 @@ All responses are JSON. GET routes are read-only; search is POST-only with `Cont
 | `GET /api/v1/roots`, `roots/{rootId-or-rootHash}` | Cached published Provenance certificates; explicit unavailable when no current source |
 | `GET /api/v1/broadcasters`, `broadcasters/{operator}` | Canonical RPC registry directory; declarations do not imply endpoint health |
 | `GET /api/v1/diagnostics`, `diagnostics/{scopeId}` | Sanitized Explorer synchronization and optional-source readiness |
-| `POST /api/v1/search` | `{ "query": "0x..." }`; public hashes/addresses only; private material rejected |
+| `POST /api/v1/search` | `{ "query": "0x...", "type": "note" }`; `type` is optional: `all`, `transaction`, `address`, `note`, `creditState`, `nullifier`, or `root`. Omission searches all types. Private material, unknown/duplicate fields and incompatible identifier shapes are rejected. |
 
 List filters are `chainId`, `protocolAddress`, `tokenAddress`, `kind`, `namespace` (or `type`), `limit` (1–200; default 20), and opaque `cursor`. Unknown or repeated query fields fail. A page contains `items`, decimal-string `total`, `snapshot`, optional `unit` and `nextCursor`. Broadcaster directory uses `items`, `sources`, `status`, `totalBasis` and `directoryCompleteness` instead of a fabricated total.
 

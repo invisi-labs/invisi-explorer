@@ -169,17 +169,47 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 	if len(values) != 0 || len(body) == 0 || len(body) > 1024 {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	var request struct{ Query string }
+	var request struct{ Query, Type string }
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	token, err := decoder.Token()
 	if err != nil || token != json.Delim('{') {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	if !decoder.More() {
+	seen := map[string]bool{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return nil, publicError("INVALID_PARAMS")
+		}
+		name, ok := key.(string)
+		if !ok || seen[name] {
+			return nil, publicError("INVALID_PARAMS")
+		}
+		seen[name] = true
+		var rawValue any
+		if decoder.Decode(&rawValue) != nil {
+			return nil, publicError("INVALID_PARAMS")
+		}
+		value, ok := rawValue.(string)
+		if !ok {
+			return nil, publicError("INVALID_PARAMS")
+		}
+		switch name {
+		case "query":
+			request.Query = value
+		case "type":
+			request.Type = value
+		default:
+			return nil, publicError("INVALID_PARAMS")
+		}
+
+	}
+	if !seen["query"] {
 		return nil, publicError("INVALID_PARAMS")
 	}
-	key, err := decoder.Token()
-	if err != nil || key != "query" || decoder.Decode(&request.Query) != nil || decoder.More() {
+	switch request.Type {
+	case "", "all", "transaction", "address", "note", "creditState", "nullifier", "root":
+	default:
 		return nil, publicError("INVALID_PARAMS")
 	}
 	if token, err = decoder.Token(); err != nil || token != json.Delim('}') {
@@ -196,6 +226,9 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 		}
 	}
 	if !hashHex(query, 32) && !hashHex(query, 20) {
+		return nil, publicError("INVALID_PARAMS")
+	}
+	if (request.Type == "address" && !hashHex(query, 20)) || (request.Type != "" && request.Type != "all" && request.Type != "address" && !hashHex(query, 32)) {
 		return nil, publicError("INVALID_PARAMS")
 	}
 	query = lower
@@ -230,6 +263,9 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 	} else {
 		definitions := []struct{ kind, from, column string }{{"transaction", "operations o", "o.tx_hash"}, {"note", "public_notes n JOIN operations o ON o.id=n.operation_id", "n.commitment"}, {"creditState", "public_credit_states n JOIN operations o ON o.id=n.operation_id", "n.commitment"}, {"nullifier", "public_nullifiers n JOIN operations o ON o.id=n.operation_id", "n.nullifier"}}
 		for _, d := range definitions {
+			if request.Type != "" && request.Type != "all" && request.Type != d.kind {
+				continue
+			}
 			params := append(append([]any(nil), args...), query)
 			extraWhere := ""
 			if d.kind == "note" || d.kind == "creditState" {
@@ -254,30 +290,32 @@ func (e *Explorer) search(ctx context.Context, values url.Values, body json.RawM
 				return nil, publicError("UNAVAILABLE")
 			}
 		}
-		rootWhere, rootArgs := e.scopeWhere("c.scope")
-		rootArgs = append(rootArgs, query)
-		rootRows, rootErr := e.db.QueryContext(ctx, e.sql("SELECT c.payload,c.generation,s.generation FROM checkpoints c JOIN scopes s ON s.id=c.scope WHERE c.published=1 AND "+rootWhere+" AND LOWER("+e.extract("c.payload", "root")+")=? ORDER BY c.scope,c.generation DESC,c.sequence DESC LIMIT 201"), rootArgs...)
-		if rootErr != nil {
-			return nil, publicError("UNAVAILABLE")
-		}
-		for rootRows.Next() {
-			var payload, generation, current string
-			if rootRows.Scan(&payload, &generation, &current) != nil {
-				rootRows.Close()
+		if request.Type == "" || request.Type == "all" || request.Type == "root" {
+			rootWhere, rootArgs := e.scopeWhere("c.scope")
+			rootArgs = append(rootArgs, query)
+			rootRows, rootErr := e.db.QueryContext(ctx, e.sql("SELECT c.payload,c.generation,s.generation FROM checkpoints c JOIN scopes s ON s.id=c.scope WHERE c.published=1 AND "+rootWhere+" AND LOWER("+e.extract("c.payload", "root")+")=? ORDER BY c.scope,c.generation DESC,c.sequence DESC LIMIT 201"), rootArgs...)
+			if rootErr != nil {
 				return nil, publicError("UNAVAILABLE")
 			}
-			var cert p.Certificate
-			if json.Unmarshal([]byte(payload), &cert) != nil {
-				rootRows.Close()
+			for rootRows.Next() {
+				var payload, generation, current string
+				if rootRows.Scan(&payload, &generation, &current) != nil {
+					rootRows.Close()
+					return nil, publicError("UNAVAILABLE")
+				}
+				var cert p.Certificate
+				if json.Unmarshal([]byte(payload), &cert) != nil {
+					rootRows.Close()
+					return nil, publicError("UNAVAILABLE")
+				}
+				id := cert.ChainID + ":" + strings.ToLower(cert.ProtocolAddress) + ":" + cert.ChainGeneration + ":" + cert.RootSequence
+				results = append(results, map[string]any{"type": "root", "hash": id, "rootId": id, "root": cert.Root, "chainId": cert.ChainID, "protocolAddress": cert.ProtocolAddress, "currentGeneration": generation == current})
+			}
+			rootErr = rootRows.Err()
+			rootRows.Close()
+			if rootErr != nil {
 				return nil, publicError("UNAVAILABLE")
 			}
-			id := cert.ChainID + ":" + strings.ToLower(cert.ProtocolAddress) + ":" + cert.ChainGeneration + ":" + cert.RootSequence
-			results = append(results, map[string]any{"type": "root", "hash": id, "rootId": id, "root": cert.Root, "chainId": cert.ChainID, "protocolAddress": cert.ProtocolAddress, "currentGeneration": generation == current})
-		}
-		rootErr = rootRows.Err()
-		rootRows.Close()
-		if rootErr != nil {
-			return nil, publicError("UNAVAILABLE")
 		}
 
 	}

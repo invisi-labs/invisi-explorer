@@ -16,7 +16,6 @@ import {
   request,
   fullTime,
   age,
-  validateSearch,
   objectIdentity,
   statusKey,
   recognitionQueryStatus,
@@ -27,6 +26,13 @@ import {
 import "./style.css";
 import { readMetadataCache, writeMetadataCache } from "./metadataCache";
 import { broadcasterDetailPath } from "./broadcasterScopes";
+import { SearchForm } from "./SearchForm";
+import {
+  searchPublic,
+  validateTypedSearch,
+  searchTypeLabels,
+  type SearchType,
+} from "./search";
 import { BroadcastersPanel } from "./BroadcastersPanel";
 import { ResponsiveHeader } from "./ResponsiveHeader";
 import { AdvancedTools } from "./AdvancedTools";
@@ -489,24 +495,47 @@ function Search() {
   const [error, setError] = useState<Key>();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<RecordData[] | null>(null);
+  const [searchType, setSearchType] = useState<SearchType>("all");
+  const [truncated, setTruncated] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
   return (
     <section className="search-area">
-      <form
-        className="search"
+      <SearchForm
+        query={query}
+        type={searchType}
+        loading={loading}
+        t={t}
+        onQuery={(value) => {
+          setQuery(value);
+          setResults(null);
+          setError(undefined);
+          setTruncated(false);
+        }}
+        onType={(value) => {
+          setSearchType(value);
+          setResults(null);
+          setError(undefined);
+          setTruncated(false);
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
-          const invalid = validateSearch(query);
+          if (loading) return;
+          const invalid = validateTypedSearch(query, searchType);
           setError(invalid ?? undefined);
           if (invalid) return;
           setLoading(true);
+          setResults(null);
+          setTruncated(false);
+          controller.current?.abort();
+          const abort = new AbortController();
+          controller.current = abort;
           try {
-            const data = await request<{ results: RecordData[] }>(
-              "/search",
-              undefined,
-              { query: query.trim() },
-            );
+            const data = await searchPublic(query, searchType, abort.signal);
+            if (abort.signal.aborted) return;
             setResults(data.results);
-            if (data.results.length === 1) {
+            setTruncated(data.truncated === true);
+            if (data.results.length === 1 && !data.truncated) {
               const r = data.results[0];
               nav(
                 objectHref(
@@ -517,43 +546,34 @@ function Search() {
               );
             }
           } catch {
-            setError("unavailable");
+            if (!abort.signal.aborted) setError("unavailable");
           } finally {
-            setLoading(false);
+            if (!abort.signal.aborted) setLoading(false);
           }
         }}
-      >
-        <input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setError(undefined);
-          }}
-          aria-label={t("search")}
-          placeholder={t("searchHint")}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <button className="primary" disabled={loading}>
-          {t("search")}
-        </button>
-      </form>
+      />
       <p className="muted">{t("searchPrivacy")}</p>
       {error && <p role="alert">{t(error)}</p>}
       {loading && <State loading />}
-      {results?.length === 0 && <State empty />}
-      {results && results.length > 1 && (
+      {truncated && (
+        <p className="pagination-message" role="status">
+          {t("searchTruncated")}
+        </p>
+      )}
+      {results?.length === 0 && !truncated && <State empty />}
+      {results && (results.length > 1 || (truncated && results.length > 0)) && (
         <div className="card">
           {results.map((r, i) => (
             <p key={i}>
               <Link
                 to={objectHref(
-                  r.type,
+                  collectionFor(r.type),
                   r,
                   r.hash ?? objectIdentity(collectionFor(r.type), r),
                 )}
               >
-                {r.type}: {r.hash ?? objectIdentity(collectionFor(r.type), r)}
+                {t(searchTypeLabels[r.type as SearchType] ?? "unknown")}:{" "}
+                {r.hash ?? objectIdentity(collectionFor(r.type), r)}
               </Link>
               <Network data={r} />
             </p>
