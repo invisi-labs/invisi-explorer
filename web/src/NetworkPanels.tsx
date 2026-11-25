@@ -203,7 +203,6 @@ export function HomeNetworks({
               <div className="home-network-row" key={group.chainId}>
                 <div className="home-network-heading">
                   <Link to={href}>{network(group.deployments[0])}</Link>
-
                 </div>
                 <div className="home-contracts">
                   <span className="muted home-contract-label">
@@ -215,6 +214,7 @@ export function HomeNetworks({
                       key={deployment.protocolAddress}
                     >
                       {address(deployment.protocolAddress, deployment)}
+                      <Link to={href}>{t("viewContracts")}</Link>
                     </div>
                   ))}
                 </div>
@@ -223,9 +223,6 @@ export function HomeNetworks({
                     {t("homeNetworkSyncIssue")}
                   </p>
                 )}
-                <div className="home-network-actions">
-                  <Link to={href}>{t("viewContracts")}</Link>
-                </div>
               </div>
             );
           })}
