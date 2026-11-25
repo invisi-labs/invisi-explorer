@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { NetworkDirectory, HomeNetworks } from "./NetworkPanels";
+import { AddressReference } from "./AddressReference";
 import { OverviewStats } from "./HomePanels";
 import { TransactionFilters } from "./TransactionFilters";
 import { networkGroups } from "./networkDirectory";
@@ -49,12 +50,22 @@ it("shows one supported network count and links the overview to dedicated lists"
         groups={groups}
         t={t}
         network={(row) => <span>{row.name}</span>}
+        address={(value, row) => (
+          <AddressReference
+            value={value}
+            kind="address"
+            compact
+            explorerUrl="https://testnet.bscscan.com"
+            internalHref={"/addresses/" + value + "?chainId=" + row.chainId}
+            t={t}
+          />
+        )}
       />
     </MemoryRouter>,
   );
   expect(html).toContain("Supported networks</span><strong>1</strong>");
   expect(html).toContain('href="/transactions"');
-  expect(html).toContain("Protocol deployments: 2");
+  expect(html).not.toContain("Protocol deployments: 2");
   expect(html).toContain('href="/networks?chainId=97"');
 });
 it("keeps deployment status and heights separate and does not claim code verification", () => {
@@ -97,7 +108,59 @@ it("uses styled filters with network icons and only enables deployment selection
   expect(render("97")).not.toContain("<select");
   expect(render("97")).toContain("complete transaction is shown");
 });
-it('keeps checksum token names selected when filter URLs use lowercase addresses',()=>{
- const html=renderToStaticMarkup(<TransactionFilters networks={networks} tokens={[{chainId:'97',address:b.toUpperCase(),symbol:'USDT'}]} value={{chainId:'97',protocolAddress:a,kind:'',tokenAddress:b}} onChange={()=>{}} t={t}/>);
- expect(html).toContain('USDT ·');
+it("keeps checksum token names selected when filter URLs use lowercase addresses", () => {
+  const html = renderToStaticMarkup(
+    <TransactionFilters
+      networks={networks}
+      tokens={[{ chainId: "97", address: b.toUpperCase(), symbol: "USDT" }]}
+      value={{ chainId: "97", protocolAddress: a, kind: "", tokenAddress: b }}
+      onChange={() => {}}
+      t={t}
+    />,
+  );
+  expect(html).toContain("USDT ·");
+});
+
+it("turns home networks into contract entry points and hides normal status", () => {
+  const render = (items: ReturnType<typeof networkGroups>) =>
+    renderToStaticMarkup(
+      <MemoryRouter>
+        <HomeNetworks
+          groups={items}
+          t={t}
+          network={(row) => <span>{row.name}</span>}
+          address={(value, row) => (
+            <AddressReference
+              value={value}
+              kind="address"
+              compact
+              explorerUrl="https://testnet.bscscan.com"
+              internalHref={"/addresses/" + value + "?chainId=" + row.chainId}
+              t={t}
+            />
+          )}
+        />
+      </MemoryRouter>,
+    );
+  const normal = render(
+    networkGroups(
+      [networks[0]],
+      [{ chainId: "97", protocolAddress: a, status: "ready" }],
+    ),
+  );
+  expect(normal).toContain(a);
+  expect(normal).toContain('aria-label="Copy full value"');
+  expect(normal).toContain("https://testnet.bscscan.com/address/" + a);
+  expect(normal).toContain("/addresses/" + a + "?chainId=97");
+  expect(normal).toContain("View contracts");
+  expect(normal).toContain("/transactions?chainId=97");
+  expect(normal).not.toContain("Operational");
+  expect(normal).not.toContain("protocol deployments");
+  expect(normal).not.toContain('role="status"');
+  const unknown = render(networkGroups([networks[0]]));
+  expect(unknown).not.toContain("Not checked");
+  expect(unknown).not.toContain('role="status"');
+  const failed = render(groups);
+  expect(failed).toContain('role="status"');
+  expect(failed).toContain("Synchronization issue");
 });

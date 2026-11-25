@@ -1212,6 +1212,7 @@ function HomePage() {
             loading={metadataPending}
             t={t}
             network={(row) => <Network data={row} />}
+            address={(value,row)=><Address value={value} data={row} kind="address" compact internalHref={objectHref("addresses",row,value)}/>}
           />
           {diagnostics.error && (
             <p className="muted" role="status">

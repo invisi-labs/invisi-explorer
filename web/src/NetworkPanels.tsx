@@ -176,12 +176,14 @@ export function HomeNetworks({
   groups,
   t,
   network,
+  address,
   loading = false,
 }: {
   loading?: boolean;
   groups: NetworkGroup[];
   t: (key: Key) => string;
   network: (row: PublicNetwork) => ReactNode;
+  address: (value: string, row: PublicNetwork) => ReactNode;
 }) {
   return (
     <section className="card home-networks">
@@ -192,29 +194,49 @@ export function HomeNetworks({
       {groups.length ? (
         <div className="home-network-list">
           {groups.map((group) => {
-            const status = group.deployments.every(
-              (d) => d.observation?.status === "ready",
-            )
-              ? "ready"
-              : group.deployments.some(
-                    (d) => d.observation?.status === "unavailable",
-                  )
-                ? "unavailable"
-                : undefined;
+            const href =
+              "/networks?chainId=" + encodeURIComponent(group.chainId);
+            const abnormal = group.deployments.some(
+              (deployment) => deployment.observation?.status === "unavailable",
+            );
             return (
               <div className="home-network-row" key={group.chainId}>
-                <Link
-                  to={"/networks?chainId=" + encodeURIComponent(group.chainId)}
-                >
-                  {network(group.deployments[0])}
-                </Link>
-                <span className="muted">
-                  {t("deploymentCount").replace(
-                    "{count}",
-                    String(group.deployments.length),
+                <div className="home-network-heading">
+                  <Link to={href}>{network(group.deployments[0])}</Link>
+                  {group.environment && (
+                    <span className="network-environment">
+                      {group.environment === "testnet"
+                        ? t("testNetwork")
+                        : group.environment === "mainnet"
+                          ? t("mainNetwork")
+                          : group.environment}
+                    </span>
                   )}
-                </span>
-                <DeploymentStatus status={status} t={t} />
+                </div>
+                <div className="home-contracts">
+                  <span className="muted home-contract-label">
+                    {t("protocolContract")}
+                  </span>
+                  {group.deployments.slice(0, 2).map((deployment) => (
+                    <div
+                      className="home-contract-reference"
+                      key={deployment.protocolAddress}
+                    >
+                      {address(deployment.protocolAddress, deployment)}
+                    </div>
+                  ))}
+                </div>
+                {abnormal && (
+                  <p className="home-network-warning" role="status">
+                    {t("homeNetworkSyncIssue")}
+                  </p>
+                )}
+                <div className="home-network-actions">
+                  <Link to={transactionPath({ chainId: group.chainId })}>
+                    {t("viewTransactions")}
+                  </Link>
+                  <Link to={href}>{t("viewContracts")}</Link>
+                </div>
               </div>
             );
           })}

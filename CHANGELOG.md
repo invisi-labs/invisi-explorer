@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make Home network cards direct protocol-contract entry points with address copying and internal/external links. Hide normal sync status and deployment counts; show a warning only for observed synchronization failures.
+
 - Add a Home overview with a deduplicated supported-network count and side-by-side network/recent-transaction panels. Move full cursor-based transaction filtering to `/transactions`, and replace Sync Status navigation with a network/contract directory retaining per-deployment synchronization data. Redirect legacy `/diagnostics` links to `/networks`.
 
 - Paginate address activities and object/root/tree occurrence records. Continue public search beyond 200 matches using authenticated snapshot cursors, retain rows on transient failures, and recover after reorg/generation changes.
