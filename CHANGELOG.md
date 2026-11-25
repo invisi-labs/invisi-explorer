@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.7
+
+- Persist recognized provenance results across temporary query failures while continuing pending-result refresh. Fence cached results by canonical bindings, source generations and reorg epochs.
+- Explain private Note inputs without treating absent public funding traces as failures. Show aggregate transaction execution once, retaining per-operation inputs, outputs, public funding and recognition.
+- Refine related-grant cards and link directly from grant identifiers.
+
 - Keep relay operating statistics private to the authenticated Broadcaster console. Remove public statistics probing, response fields and directory presentation while preserving service health and token capability discovery.
 
 ## 1.3.6
