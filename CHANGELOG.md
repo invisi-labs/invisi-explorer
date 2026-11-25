@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.3.10
+
+- Publish a coordinated release alongside RPC, Provenance and Broadcaster SDK v1.3.6 and internal IP quota exemptions. Retain Explorer's bounded upstream read budget, root synchronization and paginated transaction queries; Explorer has no direct SDK dependency.
+
 ## 1.3.9
 
 - Prevent pending recognition refreshes from exhausting Provenance's shared read quota and intermittently disabling root lists. Share a bounded read budget across chain paths on the same upstream origin, reserve capacity for root synchronization, and respect rate-limit cooldowns without delaying public reads.
