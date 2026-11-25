@@ -203,15 +203,7 @@ export function HomeNetworks({
               <div className="home-network-row" key={group.chainId}>
                 <div className="home-network-heading">
                   <Link to={href}>{network(group.deployments[0])}</Link>
-                  {group.environment && (
-                    <span className="network-environment">
-                      {group.environment === "testnet"
-                        ? t("testNetwork")
-                        : group.environment === "mainnet"
-                          ? t("mainNetwork")
-                          : group.environment}
-                    </span>
-                  )}
+
                 </div>
                 <div className="home-contracts">
                   <span className="muted home-contract-label">
@@ -232,9 +224,6 @@ export function HomeNetworks({
                   </p>
                 )}
                 <div className="home-network-actions">
-                  <Link to={transactionPath({ chainId: group.chainId })}>
-                    {t("viewTransactions")}
-                  </Link>
                   <Link to={href}>{t("viewContracts")}</Link>
                 </div>
               </div>

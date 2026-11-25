@@ -153,7 +153,8 @@ it("turns home networks into contract entry points and hides normal status", () 
   expect(normal).toContain("https://testnet.bscscan.com/address/" + a);
   expect(normal).toContain("/addresses/" + a + "?chainId=97");
   expect(normal).toContain("View contracts");
-  expect(normal).toContain("/transactions?chainId=97");
+  expect(normal).not.toContain("/transactions?chainId=97");
+  expect(normal).not.toContain('>Testnet<');
   expect(normal).not.toContain("Operational");
   expect(normal).not.toContain("protocol deployments");
   expect(normal).not.toContain('role="status"');
