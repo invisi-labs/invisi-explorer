@@ -14,6 +14,12 @@ export function OverviewStats({
     <div className="stats home-stats">
       {[
         {
+          key: "networks",
+          href: "/networks",
+          label: "supportedNetworks",
+          value: networkCount,
+        },
+        {
           key: "transactions",
           href: "/transactions",
           label: "transactions",
@@ -25,12 +31,6 @@ export function OverviewStats({
           href: "/grants",
           label: "grants",
           value: totals?.grants,
-        },
-        {
-          key: "networks",
-          href: "/networks",
-          label: "supportedNetworks",
-          value: networkCount,
         },
       ].map((item) => (
         <Link className="card" to={item.href} key={item.key}>
