@@ -14,7 +14,7 @@ import (
 )
 
 func ObserveBroadcaster(ctx context.Context, client *http.Client, chain config.Chain, record publicchain.Broadcaster) model.BroadcasterObservation {
-	out := model.BroadcasterObservation{ExpectedCodeHash: chain.CodeHash, Status: "unavailable", CheckedAt: time.Now().Unix(), IdentityStatus: "unverified", Tokens: []model.BroadcasterToken{}, TokensStatus: "unavailable", StatisticsStatus: "unavailable"}
+	out := model.BroadcasterObservation{ExpectedCodeHash: chain.CodeHash, Status: "unavailable", CheckedAt: time.Now().Unix(), IdentityStatus: "unverified", Tokens: []model.BroadcasterToken{}, TokensStatus: "unavailable"}
 	if !record.Enabled {
 		out.Status = "not_probed"
 		return out
@@ -103,16 +103,6 @@ func ObserveBroadcaster(ctx context.Context, client *http.Client, chain config.C
 	}
 	if out.TokensStatus != "complete" {
 		out.Tokens = []model.BroadcasterToken{}
-	}
-	var stats model.BroadcasterStatistics
-	if Call(ctx, client, record.Endpoint, "broadcaster_getStatistics", []any{}, &stats) == nil && stats.ChainID == chain.ChainID && strings.EqualFold(stats.Protocol, chain.ProtocolAddress) && strings.EqualFold(stats.Sender, service.Sender) && (stats.SuccessRateBPS == nil || *stats.SuccessRateBPS <= 10000) {
-		if stats.KnownGasCostWei == "" {
-			out.Statistics = &stats
-			out.StatisticsStatus = "available"
-		} else if _, err := wire.Uint(stats.KnownGasCostWei, 256); err == nil {
-			out.Statistics = &stats
-			out.StatisticsStatus = "available"
-		}
 	}
 	return out
 }

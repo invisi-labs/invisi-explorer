@@ -97,7 +97,7 @@ func refreshBroadcasters(ctx context.Context, store *readmodel.Store, live *publ
 				return fail(errors.New("invalid registered identity"))
 			}
 			prior = record.Operator
-			directory.Items = append(directory.Items, model.BroadcasterEntry{Broadcaster: record, ChainID: chain.ChainID, ProtocolAddress: strings.ToLower(chain.ProtocolAddress), ID: record.Operator, Observation: model.BroadcasterObservation{Status: "not_probed", Tokens: []model.BroadcasterToken{}, TokensStatus: "not_checked", StatisticsStatus: "not_checked"}})
+			directory.Items = append(directory.Items, model.BroadcasterEntry{Broadcaster: record, ChainID: chain.ChainID, ProtocolAddress: strings.ToLower(chain.ProtocolAddress), ID: record.Operator, Observation: model.BroadcasterObservation{Status: "not_probed", Tokens: []model.BroadcasterToken{}, TokensStatus: "not_checked"}})
 		}
 		if result.NextOperator == "" {
 			directory.Complete = true

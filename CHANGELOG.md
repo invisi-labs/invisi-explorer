@@ -1,9 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Keep relay operating statistics private to the authenticated Broadcaster console. Remove public statistics probing, response fields and directory presentation while preserving service health and token capability discovery.
+
 ## 1.3.6
 
-- Discover registered relay services from Protocol RPC and cache bounded background connectivity, deployment, token-catalog and service-statistics observations. Keep RPC registration, Explorer health checks and service declarations separate; preserve stale and missing data explicitly.
-- Add dedicated relay directory and detail views with configured-token availability, scheduling, Router support, provenance-check freshness, retained-journal statistics and collapsed technical registration information. Support older relay versions without treating missing token catalogs as empty support.
+- Discover registered relay services from Protocol RPC and cache bounded background connectivity, deployment, token-catalog and service-capability observations. Keep RPC registration, Explorer health checks and service declarations separate; preserve stale and missing data explicitly.
+- Add dedicated relay directory and detail views with configured-token availability, scheduling, Router support, provenance-check freshness and collapsed technical registration information. Support older relay versions without treating missing token catalogs as empty support.
 - Distinguish pre-revoked grant slots from creation-and-revocation history while keeping authorization labels Active/Revoked. Count full canonical slot history and bind credit-draw outputs to the matching owner and GrantID using proof-authenticated input order.
 - Consolidate technical navigation under Advanced tools, add Note generation/public-amount columns and precise query-state labels, and simplify list references and copy actions. Preserve exact amount hover/copy, metadata cache/retry behavior, private amount boundaries, canonical checks and reorg handling.
 - Retain existing databases, cursor keys, deployment scopes and service identities. No reset or reindex is required.

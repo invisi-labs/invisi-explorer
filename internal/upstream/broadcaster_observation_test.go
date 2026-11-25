@@ -48,8 +48,6 @@ func TestRegisteredBroadcasterPublicObservations(t *testing.T) {
 				tokenPage["chainId"] = "1"
 			}
 			result = tokenPage
-		case "broadcaster_getStatistics":
-			result = map[string]any{"chainId": "97", "protocol": address, "sender": address, "submitted": 8, "successful": 8, "pending": 0, "successRateBps": 10000, "knownGasCostWei": "1"}
 		default:
 			t.Fatalf("unexpected non-discovery call %s", request.Method)
 		}
@@ -57,12 +55,15 @@ func TestRegisteredBroadcasterPublicObservations(t *testing.T) {
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(string(data)))}, nil
 	})}
 	out := ObserveBroadcaster(context.Background(), client, c, record)
-	if out.Status != "available" || out.TokensStatus != "complete" || len(out.Tokens) != 1 || out.Statistics == nil || *out.Statistics.Pending != 0 {
+	if out.Status != "available" || out.TokensStatus != "complete" || len(out.Tokens) != 1 {
 		t.Fatal(out)
+	}
+	if calls != 2 {
+		t.Fatalf("public observation made %d calls, want status and token discovery only", calls)
 	}
 	mode = "legacy"
 	out = ObserveBroadcaster(context.Background(), client, c, record)
-	if out.Status != "available" || out.TokensStatus != "not_provided" || out.Statistics == nil {
+	if out.Status != "available" || out.TokensStatus != "not_provided" {
 		t.Fatal(out)
 	}
 	mode = "wrong_token_scope"
@@ -72,7 +73,7 @@ func TestRegisteredBroadcasterPublicObservations(t *testing.T) {
 	}
 	status["feeRecipient"] = "0x" + strings.Repeat("4", 40)
 	out = ObserveBroadcaster(context.Background(), client, c, record)
-	if out.Status != "identity_mismatch" || out.Service != nil || out.Statistics != nil {
+	if out.Status != "identity_mismatch" || out.Service != nil {
 		t.Fatal(out)
 	}
 	before := calls
@@ -138,5 +139,19 @@ func TestMissingCapabilityFieldsStayUnknown(t *testing.T) {
 	}
 	if value.Service.Scheduling.Enabled != nil {
 		t.Fatal("unknown became false")
+	}
+}
+
+func TestPublicBroadcasterObservationDropsLegacyStatistics(t *testing.T) {
+	var observation model.BroadcasterObservation
+	if err := json.Unmarshal([]byte(`{"status":"available","statistics":{"submitted":12345,"knownGasCostWei":"999"},"statisticsStatus":"available"}`), &observation); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(observation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "statistics") || strings.Contains(string(raw), "12345") {
+		t.Fatalf("legacy operating statistics leaked into public DTO: %s", raw)
 	}
 }

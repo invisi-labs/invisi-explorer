@@ -41,36 +41,17 @@ type BroadcasterToken struct {
 	Status          string `json:"status"`
 	PriceValidUntil string `json:"priceValidUntil,omitempty"`
 }
-type BroadcasterStatistics struct {
-	ChainID            string  `json:"chainId"`
-	Protocol           string  `json:"protocol"`
-	Sender             string  `json:"sender"`
-	Submitted          *uint64 `json:"submitted"`
-	Pending            *uint64 `json:"pending"`
-	Uncertain          *uint64 `json:"uncertain"`
-	Successful         *uint64 `json:"successful"`
-	Reverted           *uint64 `json:"reverted"`
-	Finalized          *uint64 `json:"finalized"`
-	Provisional        *uint64 `json:"provisional"`
-	ReceiptUnavailable *uint64 `json:"receiptUnavailable"`
-	CostKnown          *uint64 `json:"costKnown"`
-	CostUnknown        *uint64 `json:"costUnknown"`
-	KnownGasCostWei    string  `json:"knownGasCostWei"`
-	SuccessRateBPS     *uint64 `json:"successRateBps"`
-}
 type BroadcasterObservation struct {
-	ExpectedCodeHash string                 `json:"expectedCodeHash,omitempty"`
-	Stale            bool                   `json:"stale"`
-	Status           string                 `json:"status"`
-	CheckedAt        int64                  `json:"checkedAt"`
-	ResponseMillis   int64                  `json:"responseMillis"`
-	IdentityStatus   string                 `json:"identityStatus"`
-	Service          *BroadcasterStatus     `json:"service,omitempty"`
-	Tokens           []BroadcasterToken     `json:"tokens"`
-	TokensStatus     string                 `json:"tokensStatus"`
-	TokensCheckedAt  int64                  `json:"tokensCheckedAt,omitempty"`
-	Statistics       *BroadcasterStatistics `json:"statistics,omitempty"`
-	StatisticsStatus string                 `json:"statisticsStatus"`
+	ExpectedCodeHash string             `json:"expectedCodeHash,omitempty"`
+	Stale            bool               `json:"stale"`
+	Status           string             `json:"status"`
+	CheckedAt        int64              `json:"checkedAt"`
+	ResponseMillis   int64              `json:"responseMillis"`
+	IdentityStatus   string             `json:"identityStatus"`
+	Service          *BroadcasterStatus `json:"service,omitempty"`
+	Tokens           []BroadcasterToken `json:"tokens"`
+	TokensStatus     string             `json:"tokensStatus"`
+	TokensCheckedAt  int64              `json:"tokensCheckedAt,omitempty"`
 }
 type BroadcasterEntry struct {
 	publicchain.Broadcaster

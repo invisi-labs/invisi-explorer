@@ -1,7 +1,7 @@
 import type {ReactNode} from "react";
 import {Link} from "react-router-dom";
 import type {Key} from "./i18n";
-import {exactAmount,fullTime} from "./public";
+import {fullTime} from "./public";
 type Row=Record<string,any>;
 type Props={data:Row;t:(key:Key)=>string;network:(row:Row)=>ReactNode;token:(address:string,row:Row)=>ReactNode;address:(value:string,row:Row)=>ReactNode;href:(row:Row)=>string;detail?:boolean};
 export function broadcasterName(endpoint:unknown):string {
@@ -52,7 +52,7 @@ export function BroadcastersPanel({data,t,network,token,address,href,detail=fals
     </tr>;
    })}</tbody>
   </table></div>{!rows.length&&<p className="muted">{t(data.directoryComplete?"bcNoRegistered":"bcDirectoryPending")}</p>}</section> : rows.map((row,i)=>{
-   const observation=row.observation ?? {};const service=observation.service;const stats=observation.statistics;const tokens:Row[]=observation.tokens ?? [];
+   const observation=row.observation ?? {};const service=observation.service;const tokens:Row[]=observation.tokens ?? [];
    const provider=service?.provenance;const providerTime=Number(provider?.checkedAt);const providerStale=!providerTime||Date.now()/1000-providerTime>90||providerTime>Date.now()/1000+30;
    const source=(data.sources ?? []).find((source:Row)=>String(source.chainId)===String(row.chainId)&&source.protocolAddress?.toLowerCase()===row.protocolAddress?.toLowerCase());
    const endpoint=safeEndpoint(row.endpoint);
@@ -86,16 +86,6 @@ export function BroadcastersPanel({data,t,network,token,address,href,detail=fals
       <td data-label={t("bcAvailability")}>{t(observation.stale?"bcStale":item.status==="paused"?"bcPaused":tokenAvailable(item)?"bcAvailable":"bcPricingUnavailable")}</td>
       <td data-label={t("bcPriceExpiry")}>{item.priceValidUntil?new Date(item.priceValidUntil).toLocaleString():"—"}</td>
      </tr>)}</tbody></table>{!tokens.length&&<p>{t("bcNoConfiguredTokens")}</p>}</div>:<p className="muted">{t(observation.tokensStatus==="not_provided"?"bcLegacyTokens":"bcQueryUnavailable")}</p>}
-    </section>
-    <section className="card">
-     <h2>{t("bcStatistics")}</h2><p className="muted">{t("bcStatisticsHint")}</p>
-     {stats ? <dl className="bc-statistics">{([
-      ["bcSubmitted",stats.submitted],["bcPending",stats.pending],["bcSuccessful",stats.successful],["bcReverted",stats.reverted],["bcUncertain",stats.uncertain],["bcFinalized",stats.finalized],
-      ["bcSuccessRate",stats.successRateBps==null?null:`${(stats.successRateBps/100).toFixed(2)}%`],
-      ["bcGasCost",stats.knownGasCostWei===""||stats.knownGasCostWei==null?null:exactAmount(stats.knownGasCostWei,18)],
-      ["bcCostUnknown",stats.costUnknown],["bcReceiptUnavailable",stats.receiptUnavailable],
-     ] as [Key,unknown][]).map(([key,value])=><div key={key}><dt>{t(key)}</dt><dd>{value===null||value===undefined?"—":String(value)}</dd></div>)}</dl>:<p className="muted">{t("bcQueryUnavailable")}</p>}
-     {observation.stale&&<p className="muted">{t("bcStaleNotice")}</p>}
     </section>
     <details className="card bc-technical"><summary>{t("bcTechnical")}</summary><p className="muted">{t("bcRegistrySource")}</p><dl className="public-fields">
      <dt>{t("bcOperator")}</dt><dd>{address(row.operator,row)}</dd>

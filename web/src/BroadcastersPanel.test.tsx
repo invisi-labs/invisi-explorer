@@ -18,15 +18,15 @@ it("keeps old token catalogs unknown, old provenance health stale and technical 
  const html=render(record,true);
  expect(html).toContain("does not provide a complete token catalog");
  expect(html).toContain("Stale observation");
- expect(html).toContain("currently retained records");
+ expect(html).not.toContain("Relay statistics");
  expect(html).toContain('<details class="card bc-technical">');
  expect(html).not.toMatch(/<details[^>]*\bopen/);
  expect(html).not.toContain("100.00%");
 });
-it("renders real zero statistics and configured token availability without assuming pricing",()=>{
- const data={...record,observation:{...record.observation,tokensStatus:"complete",tokens:[{tokenAddress:"A",supported:true,status:"available"},{tokenAddress:"B",supported:false,status:"pricing_unavailable"}],statistics:{submitted:0,pending:0,successful:0,reverted:0,successRateBps:null,knownGasCostWei:"0"}}};
+it("ignores legacy private statistics while retaining public configured token availability",()=>{
+ const data={...record,observation:{...record.observation,tokensStatus:"complete",tokens:[{tokenAddress:"A",supported:true,status:"available"},{tokenAddress:"B",supported:false,status:"pricing_unavailable"}],statistics:{submitted:987654321,pending:0,successful:0,reverted:0,successRateBps:10000,knownGasCostWei:"123456789"}}};
  const html=render(data,true);
  expect(html).toContain("TOKEN(A)");expect(html).toContain("TOKEN(B)");expect(html).toContain("Pricing unavailable");
- expect(html).toContain("<dd>0</dd>");expect(html).not.toContain("0.00%");
+ expect(html).not.toContain("Relay statistics");expect(html).not.toContain("987654321");expect(html).not.toContain("100.00%");
  const list=render({items:[data],directoryComplete:true});expect(list).toContain("TOKEN(A)");expect(list).not.toContain("TOKEN(B)");
 });
